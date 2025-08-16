@@ -1,7 +1,7 @@
-import React, { useCallback } from 'react';
+import FullScreenSpinner from 'components/shared/FullScreenSpinner';
+import React from 'react';
 import { Image } from 'react-native';
-import { YStack, Paragraph, Text, useTheme } from 'tamagui';
-import FullScreenSpinner from 'app/components/shared/FullScreenSpinner';
+import { Paragraph, Text, YStack } from 'tamagui';
 
 export default function EmptyComponent({ loading, message, footer, uri }: { loading: boolean; message: string; footer?: string; uri?: string }) {
   if (loading) {

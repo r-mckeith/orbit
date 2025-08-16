@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import { HabitWithData } from '../../types';
 import { supabase } from '../useClient';
-import { HabitStreak, HabitWithData } from '../../types';
 
 export function useGetHabitsWithData(
   startDate: Date,
@@ -20,7 +20,6 @@ export function useGetHabitsWithData(
       return data ?? [];
     },
     staleTime: 1000 * 60 * 60,
-    keepPreviousData: true,
     refetchOnWindowFocus: true,
     networkMode: 'offlineFirst',
   });

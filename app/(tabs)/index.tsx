@@ -1,13 +1,13 @@
-import { AddHabitModal } from '@/components/habits/AddHabit';
-import HabitCard from '@/components/habits/HabitCard';
-import { HabitFilterButton, HabitFilterModal } from '@/components/habits/HabitFilterMenu';
-import EmptyComponent from '@/components/shared/EmptyComponent';
-import ScreenLayout from '@/components/shared/ScreenLayout';
-import SectionHeader from '@/components/shared/SectionHeader';
-import { useGetHabitStreaks, useGetHabitWeeklyStreaks } from '@/src/api/habits/useGetHabitStreaks';
-import { useGetHabitsWithData } from '@/src/api/habits/useGetHabitsWithData';
-import { useHabitContext } from '@/src/contexts/HabitContext';
-import { HabitWithData } from '@/src/types';
+import { useGetHabitStreaks, useGetHabitWeeklyStreaks } from '@api/habits/useGetHabitStreaks';
+import { useGetHabitsWithData } from '@api/habits/useGetHabitsWithData';
+import { AddHabitModal } from '@components/habits/AddHabit';
+import HabitCard from '@components/habits/HabitCard';
+import { HabitFilterButton, HabitFilterModal } from '@components/habits/HabitFilterMenu';
+import EmptyComponent from '@components/shared/EmptyComponent';
+import ScreenLayout from '@components/shared/ScreenLayout';
+import SectionHeader from '@components/shared/SectionHeader';
+import { useHabitContext } from '@src/contexts/HabitContext';
+import { HabitWithData } from '@src/types';
 import { addDays, format, startOfDay, startOfWeek } from 'date-fns';
 import { chunk } from 'lodash';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -34,17 +34,15 @@ export default function Habits() {
   const weekEnd = addDays(weekStart, 6);
 
   const { data: habitsWithData = [], isLoading: habitsLoading } = useGetHabitsWithData(weekStart, weekEnd);
-  const { data: streaks, isLoading: streaksLoading } = useGetHabitStreaks();
-  const { data: weeklyStreaks, isLoading: weeklyStreaksLoading } = useGetHabitWeeklyStreaks();
+  const { data: streaks = [], isLoading: streaksLoading } = useGetHabitStreaks();
+  const { data: weeklyStreaks = [], isLoading: weeklyStreaksLoading } = useGetHabitWeeklyStreaks();
 
   const streakMap = useMemo(() => {
-    if (!streaks) return new Map<number, string>();
-    return new Map(streaks.map(s => [s.habit_id, `${s.streak}-DAY STREAK`]));
+    return new Map(streaks.map((s: { habit_id: number; streak: number }) => [s.habit_id, `${s.streak}-DAY STREAK`]));
   }, [streaks]);
 
   const weekStreakMap = useMemo(() => {
-    if (!weeklyStreaks) return new Map<number, string>();
-    return new Map(weeklyStreaks.map(s => [s.habit_id, `${s.week_streak}-WEEK STREAK`]));
+    return new Map(weeklyStreaks.map((s: { habit_id: number; week_streak: number }) => [s.habit_id, `${s.week_streak}-WEEK STREAK`]));
   }, [weeklyStreaks]);
 
   const sections = useMemo(() => {
@@ -52,10 +50,12 @@ export default function Habits() {
 
     const todayISO = format(startOfDay(new Date()), 'yyyy-MM-dd');
 
-    let filteredHabits = habitsWithData;
+    let filteredHabits: HabitWithData[] = [...habitsWithData];
 
     if (showDueToday) {
-      filteredHabits = filteredHabits.filter(habit => habit.data.some(d => d.date === todayISO && d.due_today));
+      filteredHabits = filteredHabits.filter(habit => 
+        habit.data?.some((d: { date: string; due_today: boolean }) => d.date === todayISO && d.due_today)
+      );
     }
 
     if (showWatchlist) {

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../useClient';
 import { startOfMonth } from 'date-fns';
+import { supabase } from '../useClient';
 
 export function useGetMonthlyHabitStats(selectedDate: Date, habitId: number) {
   const startDate = startOfMonth(selectedDate).toISOString();
@@ -17,7 +17,6 @@ export function useGetMonthlyHabitStats(selectedDate: Date, habitId: number) {
       return data?.[0];
     },
     staleTime: 1000 * 60 * 60,
-    keepPreviousData: true,
     refetchOnWindowFocus: true,
     networkMode: 'offlineFirst',
   });
