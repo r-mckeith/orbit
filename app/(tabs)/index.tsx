@@ -1,75 +1,172 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { AddHabitModal } from '@/components/habits/AddHabit';
+import HabitCard from '@/components/habits/HabitCard';
+import { HabitFilterButton, HabitFilterModal } from '@/components/habits/HabitFilterMenu';
+import EmptyComponent from '@/components/shared/EmptyComponent';
+import ScreenLayout from '@/components/shared/ScreenLayout';
+import SectionHeader from '@/components/shared/SectionHeader';
+import { useGetHabitStreaks, useGetHabitWeeklyStreaks } from '@/src/api/habits/useGetHabitStreaks';
+import { useGetHabitsWithData } from '@/src/api/habits/useGetHabitsWithData';
+import { useHabitContext } from '@/src/contexts/HabitContext';
+import { HabitWithData } from '@/src/types';
+import { addDays, format, startOfDay, startOfWeek } from 'date-fns';
+import { chunk } from 'lodash';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { SectionList } from 'react-native';
+import { XStack, YStack } from 'tamagui';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+export default function Habits() {
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [selectedHabit, setSelectedHabit] = useState<HabitWithData | undefined>(undefined);
 
-export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
+  const listRef = useRef<SectionList>(null);
+
+  const handleEditHabit = (habit: HabitWithData) => {
+    setSelectedHabit(habit);
+    setShowAddModal(true);
+  };
+
+  const { selectedWeekStart, selectedSections, viewMode, showArchived, showDueToday, showWatchlist } =
+    useHabitContext();
+
+  const weekView = viewMode === 'week';
+  const weekStart = startOfWeek(selectedWeekStart, { weekStartsOn: 1 });
+  const weekEnd = addDays(weekStart, 6);
+
+  const { data: habitsWithData = [], isLoading: habitsLoading } = useGetHabitsWithData(weekStart, weekEnd);
+  const { data: streaks, isLoading: streaksLoading } = useGetHabitStreaks();
+  const { data: weeklyStreaks, isLoading: weeklyStreaksLoading } = useGetHabitWeeklyStreaks();
+
+  const streakMap = useMemo(() => {
+    if (!streaks) return new Map<number, string>();
+    return new Map(streaks.map(s => [s.habit_id, `${s.streak}-DAY STREAK`]));
+  }, [streaks]);
+
+  const weekStreakMap = useMemo(() => {
+    if (!weeklyStreaks) return new Map<number, string>();
+    return new Map(weeklyStreaks.map(s => [s.habit_id, `${s.week_streak}-WEEK STREAK`]));
+  }, [weeklyStreaks]);
+
+  const sections = useMemo(() => {
+    if (habitsLoading) return [];
+
+    const todayISO = format(startOfDay(new Date()), 'yyyy-MM-dd');
+
+    let filteredHabits = habitsWithData;
+
+    if (showDueToday) {
+      filteredHabits = filteredHabits.filter(habit => habit.data.some(d => d.date === todayISO && d.due_today));
+    }
+
+    if (showWatchlist) {
+      filteredHabits = filteredHabits.filter(habit => habit.watchlist === true);
+    }
+
+    const activeHabits = filteredHabits.filter(habit => !habit.archived);
+    const archivedHabits = filteredHabits.filter(habit => habit.archived);
+
+    const activeSections = selectedSections.map(section => ({
+      title: section,
+      data: activeHabits.filter(habit => habit.section === section),
+    }));
+
+    const allSections = [...activeSections];
+
+    if (showArchived && archivedHabits.length > 0) {
+      allSections.push({ title: 'archived', data: archivedHabits });
+    }
+
+    return allSections.filter(section => section.data.length > 0);
+  }, [habitsWithData, habitsLoading, selectedSections, showArchived, showDueToday, showWatchlist, weekView]);
+
+  const formattedSections = useMemo(() => {
+    return sections.map(section => ({
+      title: section.title,
+      data: chunk(section.data, 2),
+    }));
+  }, [sections]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (listRef.current && sections.length > 0 && sections[0].data.length > 0) {
+        listRef.current.scrollToLocation({
+          sectionIndex: 0,
+          itemIndex: 0,
+          animated: true,
+        });
+      }
+    }, 50);
+
+    return () => clearTimeout(timeout);
+  }, [viewMode]);
+
+  const renderHabitItem = useCallback(
+    ({ item }: { item: HabitWithData | HabitWithData[] }) => {
+      if (Array.isArray(item)) {
+        return (
+          <XStack px='$2' gap='$2' mb='$2' jc='space-between'>
+            {item.map(habit => {
+              const streak = habit.timeframe === 'week' ? weekStreakMap.get(habit.id) : streakMap.get(habit.id);
+
+              return (
+                <YStack key={habit.id} flex={1}>
+                  <HabitCard habit={habit} streak={streak} onPress={handleEditHabit} />
+                </YStack>
+              );
             })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+            {item.length === 1 && <YStack flex={1} />}
+          </XStack>
+        );
+      }
+
+      const habit = item;
+      const streak = habit.timeframe === 'week' ? weekStreakMap.get(habit.id) : streakMap.get(habit.id);
+
+      return <HabitCard habit={habit} streak={streak} onPress={handleEditHabit} />;
+    },
+    [streakMap, weekStreakMap, handleEditHabit]
+  );
+
+  const renderEmptyComponent = useCallback(() => {
+    return (
+      <EmptyComponent
+        loading={habitsLoading}
+        message={habitsWithData.length === 0 ? 'No habits found' : 'Please adjust your filters to see results.'}
+        uri='https://y.yarn.co/d43e9bf4-9a05-421f-a93e-086e06e3f346_text.gif'
+      />
+    );
+  }, [habitsLoading, streaksLoading, weeklyStreaksLoading, habitsWithData]);
+
+  return (
+    <>
+      <ScreenLayout title='Circles' showAddButton={true} onPress={() => setShowAddModal(true)}>
+        <HabitFilterButton showModal={showFilterModal} setShowModal={setShowFilterModal} />
+        <SectionList
+          ref={listRef}
+          sections={viewMode === 'day' ? formattedSections : sections}
+          keyExtractor={(item, index) => (viewMode === 'day' ? `section-${index}` : item.name + index)}
+          contentContainerStyle={{ paddingBottom: 90 }}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          renderItem={({ item }) => renderHabitItem({ item })}
+          renderSectionHeader={({ section }) =>
+            section.data.length === 0 ? null : <SectionHeader title={section.title.toUpperCase()} />
+          }
+          ListEmptyComponent={renderEmptyComponent}
+        />
+      </ScreenLayout>
+      <HabitFilterModal showModal={showFilterModal} setShowModal={setShowFilterModal} />
+      <AddHabitModal
+        show={showAddModal}
+        habit={selectedHabit}
+        onClose={() => {
+          setShowAddModal(false);
+          setSelectedHabit(undefined);
+        }}
+      />
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
