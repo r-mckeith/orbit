@@ -17,6 +17,7 @@
     "@react-navigation/native": "^7.1.6",
     "@tamagui/config": "^1.132.20",
     "@tamagui/font-inter": "^1.132.20",
+    "@tamagui/lucide-icons": "^1.132.20",
     "@tamagui/theme-base": "^1.132.20",
     "expo": "~53.0.20",
     "expo-blur": "~14.1.5",
