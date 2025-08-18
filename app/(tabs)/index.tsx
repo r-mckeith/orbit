@@ -73,7 +73,7 @@ const HabitPillsContainer = styled(XStack, {
 const HabitCategoryCard = ({ category }: { category: HabitCategory }) => {
   return (
     <CategoryCard key={category.id}>
-      <YStack space={8}>
+      <YStack gap={8}>
         <CategoryTitle>{category.title}</CategoryTitle>
         
         <HabitPillsContainer>
@@ -259,7 +259,7 @@ const AddHabitModal = ({ visible, onClose, onAddHabit }: {
             paddingTop={16}
           >
             <Button 
-              size="large"
+              size='$4'
               onPress={onClose}
               backgroundColor="$backgroundHover"
               borderWidth={0}
@@ -270,7 +270,7 @@ const AddHabitModal = ({ visible, onClose, onAddHabit }: {
               <Text fontSize={16} fontWeight="500">Cancel</Text>
             </Button>
             <Button 
-              size="large"
+              size='$4'
               onPress={handleSubmit}
               backgroundColor={getDefaultColorForCategory(selectedCategory)}
               borderWidth={0}
@@ -340,14 +340,14 @@ export default function HomeScreen() {
             <Button 
               circular 
               size="$4" 
-              icon={<Plus size="$1" />} 
+              icon={<Plus size="$lg" />} 
               onPress={() => setIsAddModalVisible(true)}
               backgroundColor="$blue10"
               color="white"
             />
           </XStack>
           
-          <YStack space={16}>
+          <YStack gap={16}>
             {categories.map(category => (
               <HabitCategoryCard key={category.id} category={category} />
             ))}
