@@ -1,10 +1,10 @@
 import { Plus } from '@tamagui/lucide-icons';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card, H2, H4, Input, Text, View, XStack, YStack, styled } from 'tamagui';
 
-import { habitCategories } from '@/data/habits';
+import { supabase } from '@/lib/supabase';
 import { Habit, HabitCategory } from '@/types/habits';
 
 // Styled component for habit pills
@@ -131,7 +131,7 @@ const AddHabitModal = ({ visible, onClose, onAddHabit }: {
     onAddHabit({
       name: habitName.trim(),
       category: selectedCategory,
-      frequency: 'Daily', // Default frequency, can be made configurable later
+      // frequency: 'Daily', // Default frequency, can be made configurable later
       color: getDefaultColorForCategory(selectedCategory)
     });
     
@@ -312,37 +312,120 @@ const getDefaultColorForCategory = (category: HabitCategory['id'], isSelected: b
   }
 };
 
+// Define the structure for the habit data from Supabase
+interface SupabaseHabit {
+  id: string;
+  name: string;
+  category: 'outer' | 'middle' | 'inner';
+  // frequency: string;
+  color: string;
+  created_at: string;
+  user_id: string;
+}
+
 export default function HomeScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
-  const [categories, setCategories] = useState(habitCategories);
+  const [categories, setCategories] = useState<HabitCategory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleAddHabit = (newHabit: Omit<Habit, 'id'>) => {
-    // In a real app, you would add this to your state management
-    const newCategories = categories.map(category => {
-      if (category.id === newHabit.category) {
-        return {
-          ...category,
-          habits: [
-            ...category.habits,
-            {
-              ...newHabit,
-              id: Date.now().toString(), // Simple ID generation
-            }
-          ]
-        };
-      }
-      return category;
-    });
-    
-    setCategories(newCategories);
+  // Fetch habits from Supabase
+  const fetchHabits = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const { data, error: fetchError } = await supabase
+        .from('habits')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (fetchError) throw fetchError;
+
+      // Transform the data into the format expected by the UI
+      const habitsByCategory = (data as SupabaseHabit[]).reduce((acc, habit) => {
+        if (!acc[habit.category]) {
+          acc[habit.category] = [];
+        }
+        acc[habit.category].push({
+          id: habit.id,
+          name: habit.name,
+          category: habit.category,
+          // frequency: habit.frequency,
+          color: habit.color
+        });
+        return acc;
+      }, {} as Record<string, Habit[]>);
+
+      // Define category titles and ensure they match the HabitCategory type
+      type CategoryId = 'outer' | 'middle' | 'inner';
+      const categoryTitles: Record<CategoryId, string> = {
+        outer: 'Outer Circle',
+        middle: 'Middle Circle',
+        inner: 'Inner Circle'
+      };
+
+      // Initialize all categories with empty habits array
+      const loadedCategories: HabitCategory[] = (['outer', 'middle', 'inner'] as const)
+        .map((id) => ({
+          id,
+          title: categoryTitles[id],
+          habits: habitsByCategory[id] || []
+        }));
+
+      setCategories(loadedCategories);
+    } catch (err) {
+      console.error('Error fetching habits:', err);
+      setError('Failed to load habits. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load habits when component mounts
+  useEffect(() => {
+    fetchHabits();
+  }, []);
+
+  // Refresh habits when the modal is closed
+  const handleModalClose = () => {
+    setIsAddModalVisible(false);
+    fetchHabits();
+  };
+
+  const handleAddHabit = async (newHabit: Omit<Habit, 'id'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('habits')
+        .insert([
+          {
+            name: newHabit.name,
+            category: newHabit.category,
+            // frequency: newHabit.frequency,
+            color: newHabit.color,
+            user_id: (await supabase.auth.getSession()).data.session?.user.id
+          }
+        ])
+        .select();
+
+      if (error) throw error;
+      
+      // Refresh the habits list
+      fetchHabits();
+      return true;
+    } catch (err) {
+      console.error('Error adding habit:', err);
+      Alert.alert('Error', 'Failed to add habit. Please try again.');
+      return false;
+    }
   };
 
   return (
     <ScreenContainer>
       <ScrollView 
         ref={scrollViewRef} 
-        contentContainerStyle={styles.container}
+        contentContainerStyle={{ flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
       >
         <ContentContainer>
@@ -358,17 +441,37 @@ export default function HomeScreen() {
             />
           </XStack>
           
-          <YStack gap={16}>
-            {categories.map(category => (
-              <HabitCategoryCard key={category.id} category={category} />
-            ))}
-          </YStack>
+          {isLoading ? (
+            <YStack flex={1} justifyContent="center" alignItems="center" paddingVertical="$8">
+              <Text>Loading habits...</Text>
+            </YStack>
+          ) : error ? (
+            <YStack flex={1} justifyContent="center" alignItems="center" space="$2" paddingVertical="$8">
+              <Text color="$red10">{error}</Text>
+              <Button onPress={fetchHabits}>
+                <Text>Retry</Text>
+              </Button>
+            </YStack>
+          ) : categories.length === 0 ? (
+            <YStack flex={1} justifyContent="center" alignItems="center" space="$4" paddingVertical="$8">
+              <Text>No habits found.</Text>
+              <Button onPress={() => setIsAddModalVisible(true)}>
+                <Text>Add Your First Habit</Text>
+              </Button>
+            </YStack>
+          ) : (
+            <YStack gap={16}>
+              {categories.map(category => (
+                <HabitCategoryCard key={category.id} category={category} />
+              ))}
+            </YStack>
+          )}
         </ContentContainer>
       </ScrollView>
       
       <AddHabitModal 
         visible={isAddModalVisible}
-        onClose={() => setIsAddModalVisible(false)}
+        onClose={handleModalClose}
         onAddHabit={handleAddHabit}
       />
     </ScreenContainer>

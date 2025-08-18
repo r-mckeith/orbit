@@ -2,7 +2,7 @@ export type Habit = {
   id: string;
   name: string;
   category: 'outer' | 'middle' | 'inner';
-  frequency: string;
+  frequency?: string;
   color: string;
 };
 
