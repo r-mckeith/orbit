@@ -17,9 +17,10 @@ module.exports = function (api) {
       [
         'module-resolver',
         {
-          root: ['./'],
+          root: ['.'],
           extensions: ['.ios.js', '.android.js', '.js', '.ts', '.tsx', '.json'],
           alias: {
+            '@': './',
             '@components': './components',
             '@screens': './app/screens',
             '@src': './src',
@@ -27,7 +28,9 @@ module.exports = function (api) {
             '@contexts': './src/contexts',
             '@api': './src/api',
             '@types': './types',
+            '@lib': './lib',
           },
+          cwd: 'packagejson',
         },
     ],
       // has to be listed last
