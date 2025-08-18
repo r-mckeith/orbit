@@ -26,16 +26,23 @@ const HabitPillText = styled(Text, {
 });
 
 const HabitPillComponent = ({ habit }: { habit: Habit }) => {
+  const [isSelected, setIsSelected] = useState(false);
+  const color = getDefaultColorForCategory(habit.category, isSelected);
+  
   return (
     <HabitPill 
-      key={habit.id} 
+      key={habit.id}
+      onPress={() => setIsSelected(!isSelected)}
       style={{
-        backgroundColor: `${habit.color}20`,
+        backgroundColor: isSelected ? `${color}20` : '#E0E0E0',
         borderWidth: 1,
-        borderColor: `${habit.color}40`,
+        borderColor: isSelected ? `${color}40` : '#333',
       }}
     >
-      <HabitPillText style={{ color: habit.color }}>
+      <HabitPillText style={{ 
+        color: isSelected ? color : '#333',
+        opacity: isSelected ? 1 : 0.9
+      }}>
         {habit.name}
       </HabitPillText>
     </HabitPill>
@@ -292,12 +299,16 @@ const AddHabitModal = ({ visible, onClose, onAddHabit }: {
 };
 
 // Helper function to get default colors for categories
-const getDefaultColorForCategory = (category: HabitCategory['id']): string => {
+const getDefaultColorForCategory = (category: HabitCategory['id'], isSelected: boolean = false): string => {
+  // Return neutral color if not selected
+  if (!isSelected) return '#BDBDBD';
+  
+  // Return category-specific color when selected
   switch (category) {
-    case 'outer': return '#4CAF50';
-    case 'middle': return '#9E9E9E';
-    case 'inner': return '#F44336';
-    default: return '#4CAF50';
+    case 'outer': return '#3b82f6';  // blue-500
+    case 'middle': return '#f59e0b'; // yellow-500
+    case 'inner': return '#ef4444';  // red-500
+    default: return '#9E9E9E';
   }
 };
 
