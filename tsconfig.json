@@ -4,6 +4,7 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
+      "@/*": ["./*"],
       "@components/*": ["./components/*"],
       "@screens/*": ["./app/screens/*"],
       "@src/*": ["./src/*"],
@@ -13,20 +14,14 @@
       "@types/*": ["./types/*"]
     },
     "esModuleInterop": true,
-    "jsx": "react-native"
+    "jsx": "react-native",
+    "typeRoots": ["./node_modules/@types", "./types"]
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
-    "expo-env.d.ts"
-  ],
-  "paths": {
-    "@/*": ["./*"],
-    "@components/*": ["app/components/*"],
-    "@screens/*": ["app/screens/*"],
-    "@src/*": ["src/*"],
-    "@hooks/*": ["src/hooks/*"],
-    "@contexts/*": ["src/contexts/*"]
-  }
+    "expo-env.d.ts",
+    "types/**/*.d.ts"
+  ]
 }
