@@ -25,23 +25,60 @@ const HabitPillText = styled(Text, {
   ellipsizeMode: 'tail',
 });
 
-const HabitPillComponent = ({ habit }: { habit: Habit }) => {
-  const [isSelected, setIsSelected] = useState(false);
-  const color = getDefaultColorForCategory(habit.category, isSelected);
+const HabitPillComponent = ({ habit, fetchHabits }: { habit: Habit, fetchHabits: () => void }) => {
+  const color = getDefaultColorForCategory(habit.category, habit.isSelected);
+  
+  const toggleHabitSelection = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        Alert.alert('Error', 'You must be logged in to track habits');
+        return;
+      }
+
+      if (habit.isSelected) {
+        // Remove the habit_data entry
+        const { error } = await supabase
+          .from('habit_data')
+          .delete()
+          .eq('habit_id', habit.id)
+          .eq('date', new Date().toISOString().split('T')[0]);
+        
+        if (error) throw error;
+      } else {
+        // Add a new habit_data entry
+        const { error } = await supabase
+          .from('habit_data')
+          .insert([{ 
+            habit_id: habit.id,
+            user_id: session.user.id,
+            date: new Date().toISOString().split('T')[0]
+          }]);
+        
+        if (error) throw error;
+      }
+
+      // Refresh the habits to update the UI
+      fetchHabits();
+    } catch (err) {
+      console.error('Error toggling habit selection:', err);
+      Alert.alert('Error', 'Failed to update habit tracking');
+    }
+  };
   
   return (
     <HabitPill 
       key={habit.id}
-      onPress={() => setIsSelected(!isSelected)}
+      onPress={toggleHabitSelection}
       style={{
-        backgroundColor: isSelected ? `${color}20` : '#E0E0E0',
+        backgroundColor: habit.isSelected ? `${color}20` : '#f1f1f1',
         borderWidth: 1,
-        borderColor: isSelected ? `${color}40` : '#333',
+        borderColor: habit.isSelected ? `${color}40` : '#e0e0e0',
       }}
     >
       <HabitPillText style={{ 
-        color: isSelected ? color : '#333',
-        opacity: isSelected ? 1 : 0.9
+        color: habit.isSelected ? color : '#333',
+        opacity: habit.isSelected ? 1 : 0.9
       }}>
         {habit.name}
       </HabitPillText>
@@ -77,15 +114,18 @@ const HabitPillsContainer = styled(XStack, {
   paddingBottom: 4,
 });
 
-const HabitCategoryCard = ({ category }: { category: HabitCategory }) => {
+const HabitCategoryCard = ({ category, fetchHabits }: { category: HabitCategory, fetchHabits: () => void }) => {
   return (
     <CategoryCard key={category.id}>
       <YStack gap={8}>
         <CategoryTitle>{category.title}</CategoryTitle>
-        
         <HabitPillsContainer>
           {category.habits.map(habit => (
-            <HabitPillComponent key={habit.id} habit={habit} />
+            <HabitPillComponent 
+              key={habit.id} 
+              habit={habit} 
+              fetchHabits={fetchHabits} 
+            />
           ))}
         </HabitPillsContainer>
       </YStack>
@@ -325,26 +365,48 @@ interface SupabaseHabit {
 
 export default function HomeScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
-  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [categories, setCategories] = useState<HabitCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
 
-  // Fetch habits from Supabase
   const fetchHabits = async () => {
     try {
       setIsLoading(true);
       setError(null);
       
-      const { data, error: fetchError } = await supabase
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Get the current user session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      // Fetch all habits for the user
+      const { data: habitsData, error: habitsError } = await supabase
         .from('habits')
         .select('*')
+        .eq('user_id', session.user.id)
         .order('created_at', { ascending: true });
 
-      if (fetchError) throw fetchError;
+      if (habitsError) throw habitsError;
+
+      // Fetch today's completed habits
+      const { data: completedHabits, error: completedError } = await supabase
+        .from('habit_data')
+        .select('habit_id')
+        .eq('date', today)
+        .eq('user_id', session.user.id);
+
+      if (completedError) throw completedError;
+
+      // Create a set of completed habit IDs for quick lookup
+      const completedHabitIds = new Set(completedHabits?.map(h => h.habit_id) || []);
 
       // Transform the data into the format expected by the UI
-      const habitsByCategory = (data as SupabaseHabit[]).reduce((acc, habit) => {
+      const habitsByCategory = (habitsData || []).reduce((acc, habit) => {
         if (!acc[habit.category]) {
           acc[habit.category] = [];
         }
@@ -352,8 +414,8 @@ export default function HomeScreen() {
           id: habit.id,
           name: habit.name,
           category: habit.category,
-          // frequency: habit.frequency,
-          color: habit.color
+          color: habit.color,
+          isSelected: completedHabitIds.has(habit.id)
         });
         return acc;
       }, {} as Record<string, Habit[]>);
@@ -366,7 +428,7 @@ export default function HomeScreen() {
         inner: 'Inner Circle'
       };
 
-      // Initialize all categories with empty habits array
+      // Initialize all categories with their habits
       const loadedCategories: HabitCategory[] = (['outer', 'middle', 'inner'] as const)
         .map((id) => ({
           id,
@@ -396,28 +458,32 @@ export default function HomeScreen() {
 
   const handleAddHabit = async (newHabit: Omit<Habit, 'id'>) => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        Alert.alert('Error', 'You must be logged in to add habits');
+        return;
+      }
+
+      // Ensure all required fields are present
+      const habitToAdd = {
+        name: newHabit.name,
+        category: newHabit.category,
+        color: newHabit.color,
+        user_id: session.user.id,
+      };
+
       const { data, error } = await supabase
         .from('habits')
-        .insert([
-          {
-            name: newHabit.name,
-            category: newHabit.category,
-            // frequency: newHabit.frequency,
-            color: newHabit.color,
-            user_id: (await supabase.auth.getSession()).data.session?.user.id
-          }
-        ])
+        .insert([habitToAdd])
         .select();
 
       if (error) throw error;
-      
+
       // Refresh the habits list
       fetchHabits();
-      return true;
     } catch (err) {
       console.error('Error adding habit:', err);
-      Alert.alert('Error', 'Failed to add habit. Please try again.');
-      return false;
+      Alert.alert('Error', 'Failed to add habit');
     }
   };
 
@@ -462,7 +528,11 @@ export default function HomeScreen() {
           ) : (
             <YStack gap={16}>
               {categories.map(category => (
-                <HabitCategoryCard key={category.id} category={category} />
+                <HabitCategoryCard 
+                  key={category.id} 
+                  category={category} 
+                  fetchHabits={fetchHabits} 
+                />
               ))}
             </YStack>
           )}
