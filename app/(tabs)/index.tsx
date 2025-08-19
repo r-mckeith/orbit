@@ -25,44 +25,36 @@ const HabitPillText = styled(Text, {
   ellipsizeMode: 'tail',
 });
 
-const HabitPillComponent = ({ habit, fetchHabits }: { habit: Habit, fetchHabits: () => void }) => {
+interface HabitPillComponentProps {
+  habit: Habit;
+  fetchHabits: () => Promise<void>;
+  onToggleHabit: (habitId: string, isSelected: boolean) => Promise<void>;
+}
+
+const HabitPillComponent = ({ 
+  habit, 
+  fetchHabits,
+  onToggleHabit
+}: HabitPillComponentProps) => {
+  const [isToggling, setIsToggling] = useState(false);
   const color = getDefaultColorForCategory(habit.category, habit.isSelected);
   
   const toggleHabitSelection = async () => {
+    if (isToggling) return; // Prevent double-taps
+    
+    setIsToggling(true);
+    
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        Alert.alert('Error', 'You must be logged in to track habits');
-        return;
-      }
-
-      if (habit.isSelected) {
-        // Remove the habit_data entry
-        const { error } = await supabase
-          .from('habit_data')
-          .delete()
-          .eq('habit_id', habit.id)
-          .eq('date', new Date().toISOString().split('T')[0]);
-        
-        if (error) throw error;
-      } else {
-        // Add a new habit_data entry
-        const { error } = await supabase
-          .from('habit_data')
-          .insert([{ 
-            habit_id: habit.id,
-            user_id: session.user.id,
-            date: new Date().toISOString().split('T')[0]
-          }]);
-        
-        if (error) throw error;
-      }
-
-      // Refresh the habits to update the UI
-      fetchHabits();
+      // The optimistic update is now handled by the parent component
+      await onToggleHabit(habit.id, !habit.isSelected);
+      
+      // Refresh the habits to ensure we're in sync with the server
+      await fetchHabits();
     } catch (err) {
       console.error('Error toggling habit selection:', err);
       Alert.alert('Error', 'Failed to update habit tracking');
+    } finally {
+      setIsToggling(false);
     }
   };
   
@@ -114,7 +106,17 @@ const HabitPillsContainer = styled(XStack, {
   paddingBottom: 4,
 });
 
-const HabitCategoryCard = ({ category, fetchHabits }: { category: HabitCategory, fetchHabits: () => void }) => {
+interface HabitCategoryCardProps {
+  category: HabitCategory;
+  fetchHabits: () => Promise<void>;
+  onToggleHabit: (habitId: string, isSelected: boolean) => Promise<void>;
+}
+
+const HabitCategoryCard = ({ 
+  category, 
+  fetchHabits,
+  onToggleHabit 
+}: HabitCategoryCardProps) => {
   return (
     <CategoryCard key={category.id}>
       <YStack gap={8}>
@@ -124,7 +126,8 @@ const HabitCategoryCard = ({ category, fetchHabits }: { category: HabitCategory,
             <HabitPillComponent 
               key={habit.id} 
               habit={habit} 
-              fetchHabits={fetchHabits} 
+              fetchHabits={fetchHabits}
+              onToggleHabit={onToggleHabit}
             />
           ))}
         </HabitPillsContainer>
@@ -366,11 +369,55 @@ interface SupabaseHabit {
 export default function HomeScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const [categories, setCategories] = useState<HabitCategory[]>([]);
+  
+  // Function to handle toggling a habit's selection state
+  const handleToggleHabit = async (habitId: string, isSelected: boolean): Promise<void> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('Not authenticated');
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (isSelected) {
+      // Add a new habit_data entry
+      const { error: insertError } = await supabase
+        .from('habit_data')
+        .insert([{ 
+          habit_id: habitId,
+          user_id: session.user.id,
+          date: today
+        }]);
+      
+      if (insertError) throw insertError;
+    } else {
+      // Remove the habit_data entry
+      const { error: deleteError } = await supabase
+        .from('habit_data')
+        .delete()
+        .eq('habit_id', habitId)
+        .eq('date', today);
+        
+      if (deleteError) throw deleteError;
+    }
+    
+    // Update local state
+    setCategories(prevCategories => 
+      prevCategories.map(category => ({
+        ...category,
+        habits: category.habits.map(habit => 
+          habit.id === habitId ? { ...habit, isSelected } : habit
+        )
+      }))
+    );
+    
+    // No return value needed as we're using Promise<void>
+  };
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
 
-  const fetchHabits = async () => {
+  const fetchHabits = async (): Promise<void> => {
     try {
       setIsLoading(true);
       setError(null);
@@ -406,7 +453,7 @@ export default function HomeScreen() {
       const completedHabitIds = new Set(completedHabits?.map(h => h.habit_id) || []);
 
       // Transform the data into the format expected by the UI
-      const habitsByCategory = (habitsData || []).reduce((acc, habit) => {
+      const habitsByCategory = (habitsData || []).reduce<Record<string, Habit[]>>((acc, habit) => {
         if (!acc[habit.category]) {
           acc[habit.category] = [];
         }
@@ -418,7 +465,7 @@ export default function HomeScreen() {
           isSelected: completedHabitIds.has(habit.id)
         });
         return acc;
-      }, {} as Record<string, Habit[]>);
+      }, {});
 
       // Define category titles and ensure they match the HabitCategory type
       type CategoryId = 'outer' | 'middle' | 'inner';
@@ -440,6 +487,7 @@ export default function HomeScreen() {
     } catch (err) {
       console.error('Error fetching habits:', err);
       setError('Failed to load habits. Please try again.');
+      throw err; // Re-throw the error so callers can handle it
     } finally {
       setIsLoading(false);
     }
@@ -530,8 +578,9 @@ export default function HomeScreen() {
               {categories.map(category => (
                 <HabitCategoryCard 
                   key={category.id} 
-                  category={category} 
-                  fetchHabits={fetchHabits} 
+                  category={category}
+                  fetchHabits={fetchHabits}
+                  onToggleHabit={handleToggleHabit}
                 />
               ))}
             </YStack>
