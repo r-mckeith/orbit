@@ -27,13 +27,11 @@ const HabitPillText = styled(Text, {
 
 interface HabitPillComponentProps {
   habit: Habit;
-  fetchHabits: () => Promise<void>;
   onToggleHabit: (habitId: string, isSelected: boolean) => Promise<void>;
 }
 
 const HabitPillComponent = ({ 
   habit, 
-  fetchHabits,
   onToggleHabit
 }: HabitPillComponentProps) => {
   const [isToggling, setIsToggling] = useState(false);
@@ -45,11 +43,9 @@ const HabitPillComponent = ({
     setIsToggling(true);
     
     try {
-      // The optimistic update is now handled by the parent component
+      // The optimistic update is handled by the parent component
+      // No need to fetch habits again as we're updating optimistically
       await onToggleHabit(habit.id, !habit.isSelected);
-      
-      // Refresh the habits to ensure we're in sync with the server
-      await fetchHabits();
     } catch (err) {
       console.error('Error toggling habit selection:', err);
       Alert.alert('Error', 'Failed to update habit tracking');
@@ -108,13 +104,11 @@ const HabitPillsContainer = styled(XStack, {
 
 interface HabitCategoryCardProps {
   category: HabitCategory;
-  fetchHabits: () => Promise<void>;
   onToggleHabit: (habitId: string, isSelected: boolean) => Promise<void>;
 }
 
 const HabitCategoryCard = ({ 
   category, 
-  fetchHabits,
   onToggleHabit 
 }: HabitCategoryCardProps) => {
   return (
@@ -126,7 +120,6 @@ const HabitCategoryCard = ({
             <HabitPillComponent 
               key={habit.id} 
               habit={habit} 
-              fetchHabits={fetchHabits}
               onToggleHabit={onToggleHabit}
             />
           ))}
@@ -579,7 +572,6 @@ export default function HomeScreen() {
                 <HabitCategoryCard 
                   key={category.id} 
                   category={category}
-                  fetchHabits={fetchHabits}
                   onToggleHabit={handleToggleHabit}
                 />
               ))}
