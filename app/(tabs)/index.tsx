@@ -1,6 +1,6 @@
 import { Plus } from '@tamagui/lucide-icons';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet } from 'react-native';
+import { Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card, H2, H4, Input, Text, View, XStack, YStack, styled } from 'tamagui';
 
@@ -90,12 +90,6 @@ const CategoryTitle = styled(H4, {
   marginBottom: 4,
 });
 
-const CategoryDescription = styled(Text, {
-  color: '$colorHover',
-  fontSize: 14,
-  opacity: 0.8,
-});
-
 const HabitPillsContainer = styled(XStack, {
   flexWrap: 'wrap',
   marginTop: 12,
@@ -140,11 +134,6 @@ const ContentContainer = styled(YStack, {
   space: 16,
 });
 
-const HeaderContainer = styled(YStack, {
-  space: 8,
-  paddingBottom: 8,
-});
-
 const Title = styled(H2, {
   color: '$color',
   fontWeight: '700',
@@ -167,7 +156,6 @@ const AddHabitModal = ({ visible, onClose, onAddHabit }: {
     onAddHabit({
       name: habitName.trim(),
       category: selectedCategory,
-      // frequency: 'Daily', // Default frequency, can be made configurable later
       color: getDefaultColorForCategory(selectedCategory)
     });
     
@@ -225,7 +213,6 @@ const AddHabitModal = ({ visible, onClose, onAddHabit }: {
             </YStack>
             
             <YStack gap={10}>              
-              {/* Outer Button - Full Width */}
               <Button
                 width="100%"
                 height={44}
@@ -257,7 +244,6 @@ const AddHabitModal = ({ visible, onClose, onAddHabit }: {
                 </Text>
               </Button>
               
-              {/* Middle and Inner Buttons - Side by Side */}
               <XStack gap={10} width="100%">
                 {(['middle', 'inner'] as const).map((category) => (
                   <Button
@@ -353,7 +339,6 @@ interface SupabaseHabit {
   id: string;
   name: string;
   category: 'outer' | 'middle' | 'inner';
-  // frequency: string;
   color: string;
   created_at: string;
   user_id: string;
@@ -588,9 +573,3 @@ export default function HomeScreen() {
     </ScreenContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-  },
-});
