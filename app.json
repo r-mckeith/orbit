@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "orbit",
-    "slug": "orbit",
+    "name": "circles",
+    "slug": "circles",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "orbit",
+    "scheme": "circles",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
