@@ -1,10 +1,11 @@
 import { Plus } from '@tamagui/lucide-icons';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card, H2, H4, Input, Text, View, XStack, YStack, styled } from 'tamagui';
 
-import { useAddHabit, useHabitCategories, useHabits } from '../../hooks/useHabits';
+import { HABITS_QUERY_KEY, useAddHabit, useHabitCategories, useHabits } from '../../hooks/useHabits';
 import { supabase } from '../../lib/supabase';
 import { Habit, HabitCategory } from '../../types/habits';
 
@@ -36,19 +37,56 @@ const HabitPillComponent = ({
   onToggleHabit
 }: HabitPillComponentProps) => {
   const [isToggling, setIsToggling] = useState(false);
-  const color = getDefaultColorForCategory(habit.category, habit.isSelected);
+  const [localIsSelected, setLocalIsSelected] = useState(habit.isSelected ?? false);
+  
+  // Update local state when the prop changes
+  useEffect(() => {
+    console.log('Habit prop changed', { habitId: habit.id, isSelected: habit.isSelected });
+    setLocalIsSelected(prev => {
+      // Only update if the value has actually changed
+      if (habit.isSelected !== undefined && habit.isSelected !== prev) {
+        console.log('Updating local isSelected state from prop', { prev, new: habit.isSelected });
+        return habit.isSelected;
+      }
+      return prev;
+    });
+  }, [habit.isSelected]);
+  
+  // Use a ref to track the current value to avoid stale closures
+  const isSelectedRef = useRef(localIsSelected);
+  isSelectedRef.current = localIsSelected;
+  
+  const color = getDefaultColorForCategory(habit.category, localIsSelected);
   
   const toggleHabitSelection = async () => {
-    if (isToggling) return; // Prevent double-taps
+    const newState = !localIsSelected;
+    console.log('toggleHabitSelection called', { 
+      habitId: habit.id, 
+      currentState: localIsSelected,
+      newState 
+    });
     
+    if (isToggling) {
+      console.log('Already toggling, ignoring');
+      return; // Prevent double-taps
+    }
+    
+    // Optimistically update the UI
+    setLocalIsSelected(newState);
     setIsToggling(true);
     
     try {
-      // The optimistic update is handled by the parent component
-      // No need to fetch habits again as we're updating optimistically
-      await onToggleHabit(habit.id, !habit.isSelected);
+      console.log('Calling onToggleHabit with', { 
+        habitId: habit.id, 
+        isSelected: newState 
+      });
+      
+      await onToggleHabit(habit.id, newState);
+      console.log('onToggleHabit completed successfully');
     } catch (err) {
       console.error('Error toggling habit selection:', err);
+      // Revert optimistic update on error
+      setLocalIsSelected(!newState);
       Alert.alert('Error', 'Failed to update habit tracking');
     } finally {
       setIsToggling(false);
@@ -56,22 +94,24 @@ const HabitPillComponent = ({
   };
   
   return (
-    <HabitPill 
-      key={habit.id}
-      onPress={toggleHabitSelection}
-      style={{
-        backgroundColor: habit.isSelected ? `${color}20` : '#f1f1f1',
-        borderWidth: 1,
-        borderColor: habit.isSelected ? `${color}40` : '#e0e0e0',
-      }}
-    >
-      <HabitPillText style={{ 
-        color: habit.isSelected ? color : '#333',
-        opacity: habit.isSelected ? 1 : 0.9
-      }}>
-        {habit.name}
-      </HabitPillText>
-    </HabitPill>
+    <Pressable onPress={toggleHabitSelection} disabled={isToggling}>
+      <HabitPill 
+        key={habit.id}
+        style={{
+          backgroundColor: localIsSelected ? `${color}20` : '#f1f1f1',
+          borderWidth: 1,
+          borderColor: localIsSelected ? `${color}40` : '#e0e0e0',
+          opacity: isToggling ? 0.7 : 1,
+        }}
+      >
+        <HabitPillText style={{ 
+          color: localIsSelected ? color : '#333',
+          opacity: localIsSelected ? 1 : 0.9
+        }}>
+          {habit.name}
+        </HabitPillText>
+      </HabitPill>
+    </Pressable>
   );
 };
 
@@ -388,19 +428,28 @@ interface SupabaseHabit {
   user_id: string;
 }
 
+interface Session {
+  user: {
+    id: string;
+    // Add other user properties as needed
+  };
+  // Add other session properties as needed
+}
+
 export default function HomeScreen() {
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [selectedHabits, setSelectedHabits] = useState<Record<string, boolean>>({});
   const scrollViewRef = useRef<ScrollView>(null);
   
   // Get the current user session
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const today = new Date().toISOString().split('T')[0];
+  const queryClient = useQueryClient();
   
   useEffect(() => {
     const getSession = async () => {
       const { data } = await supabase.auth.getSession();
-      setSession(data.session);
+      setSession(data.session as Session | null);
     };
     
     getSession();
@@ -431,16 +480,20 @@ export default function HomeScreen() {
     }
   };
 
-  // Handle toggling a habit's selection state
-  const handleToggleHabit = async (habitId: string, isSelected: boolean): Promise<void> => {
-    if (!session) {
-      throw new Error('Not authenticated');
-    }
+  // Mutation for toggling habit selection with optimistic updates
+  const toggleHabitMutation = useMutation({
+    mutationFn: async ({ habitId, isSelected }: { habitId: string; isSelected: boolean }) => {
+      console.log('mutationFn called', { habitId, isSelected });
+      
+      if (!session) {
+        console.error('No session found');
+        throw new Error('Not authenticated');
+      }
 
-    try {
       if (isSelected) {
+        console.log('Adding habit to habit_data');
         // Add to habit_data
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('habit_data')
           .insert([
             { 
@@ -448,28 +501,84 @@ export default function HomeScreen() {
               date: today,
               user_id: session.user.id 
             }
-          ]);
+          ])
+          .select();
         
-        if (error) throw error;
+        console.log('Insert result', { data, error });
+        
+        if (error && error.code !== '23505') { // Ignore duplicate key errors
+          console.error('Error inserting habit data:', error);
+          throw error;
+        }
+        console.log('Habit added successfully');
       } else {
+        console.log('Removing habit from habit_data');
         // Remove from habit_data
-        const { error } = await supabase
+        const { error, count } = await supabase
           .from('habit_data')
           .delete()
           .eq('habit_id', habitId)
           .eq('date', today)
           .eq('user_id', session.user.id);
         
-        if (error) throw error;
+        console.log('Delete result', { error, count });
+        
+        if (error) {
+          console.error('Error deleting habit data:', error);
+          throw error;
+        }
+        console.log('Habit removed successfully');
       }
+      return { habitId, isSelected };
+    },
+    // Optimistic update
+    onMutate: async ({ habitId, isSelected }) => {
+      console.log('onMutate called', { habitId, isSelected });
       
-      // Update local state
-      setSelectedHabits(prevSelectedHabits => ({
-        ...prevSelectedHabits,
-        [habitId]: isSelected
-      }));
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({ queryKey: [HABITS_QUERY_KEY, session?.user.id] });
+
+      // Snapshot the previous value
+      const previousHabits = queryClient.getQueryData<Habit[]>([HABITS_QUERY_KEY, session?.user.id]);
+      console.log('Previous habits:', previousHabits);
+
+      // Optimistically update to the new value
+      if (previousHabits) {
+        const updatedHabits = previousHabits.map(habit => 
+          habit.id === habitId 
+            ? { ...habit, isSelected } 
+            : habit
+        );
+        
+        console.log('Setting query data with updated habits:', updatedHabits);
+        queryClient.setQueryData<Habit[]>([HABITS_QUERY_KEY, session?.user.id], updatedHabits);
+      }
+
+      // Return a context object with the snapshotted value
+      return { previousHabits };
+    },
+    // If the mutation fails, use the context returned from onMutate to roll back
+    onError: (err, variables, context) => {
+      console.error('Mutation failed, rolling back', err);
+      if (context?.previousHabits) {
+        queryClient.setQueryData([HABITS_QUERY_KEY], context.previousHabits);
+      }
+    },
+    // Always refetch after error or success:
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: [HABITS_QUERY_KEY] });
+    },
+  });
+
+  // Handle toggling a habit's selection state
+  const handleToggleHabit = async (habitId: string, isSelected: boolean): Promise<void> => {
+    console.log('handleToggleHabit called', { habitId, isSelected });
+    try {
+      console.log('Calling toggleHabitMutation.mutateAsync');
+      const result = await toggleHabitMutation.mutateAsync({ habitId, isSelected });
+      console.log('toggleHabitMutation completed', { result });
     } catch (err) {
-      console.error('Error toggling habit:', err);
+      console.error('Error in handleToggleHabit:', err);
       throw err;
     }
   };
@@ -483,7 +592,7 @@ export default function HomeScreen() {
       >
         <ContentContainer>
           <XStack justifyContent="space-between" alignItems="center" marginBottom="$4">
-            <Title>Circles</Title>
+            <H2>Circles</H2>
             <Button 
               circular 
               size="$4" 

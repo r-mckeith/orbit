@@ -8,14 +8,35 @@ export const useHabits = (userId: string) => {
   return useQuery({
     queryKey: [HABITS_QUERY_KEY, userId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Get today's date in the local timezone
+      const today = new Date().toISOString().split('T')[0];
+      
+      // First, get all habits
+      const { data: habits, error: habitsError } = await supabase
         .from('habits')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      return data as Habit[];
+      if (habitsError) throw habitsError;
+      
+      // Then, get today's habit_data
+      const { data: habitData, error: dataError } = await supabase
+        .from('habit_data')
+        .select('habit_id')
+        .eq('user_id', userId)
+        .eq('date', today);
+
+      if (dataError) throw dataError;
+      
+      // Create a Set of habit IDs that are selected today for quick lookup
+      const selectedHabitIds = new Set(habitData?.map(hd => hd.habit_id) || []);
+      
+      // Add isSelected property to each habit
+      return habits.map(habit => ({
+        ...habit,
+        isSelected: selectedHabitIds.has(habit.id)
+      })) as Habit[];
     },
     enabled: !!userId,
   });
