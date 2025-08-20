@@ -4,8 +4,9 @@ import { Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card, H2, H4, Input, Text, View, XStack, YStack, styled } from 'tamagui';
 
-import { supabase } from '@/lib/supabase';
-import { Habit, HabitCategory } from '@/types/habits';
+import { supabase } from '../../lib/supabase';
+import { Habit, HabitCategory } from '../../types/habits';
+import { useHabits, useAddHabit, useHabitCategories } from '../../hooks/useHabits';
 
 // Styled component for habit pills
 const HabitPill = styled(View, {
@@ -352,171 +353,88 @@ interface SupabaseHabit {
 }
 
 export default function HomeScreen() {
+  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+  const [selectedHabits, setSelectedHabits] = useState<Record<string, boolean>>({});
   const scrollViewRef = useRef<ScrollView>(null);
-  const [categories, setCategories] = useState<HabitCategory[]>([]);
   
-  // Function to handle toggling a habit's selection state
+  // Get the current user session
+  const [session, setSession] = useState<any>(null);
+  const today = new Date().toISOString().split('T')[0];
+  
+  useEffect(() => {
+    const getSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      setSession(data.session);
+    };
+    
+    getSession();
+  }, []);
+  
+  // Fetch habits using TanStack Query
+  const { data: habits = [], isLoading, error } = useHabits(session?.user?.id || '');
+  
+  // Get categories with their associated habits
+  const { data: categories = [] } = useHabitCategories(habits);
+  
+  // Mutation for adding a new habit
+  const addHabitMutation = useAddHabit();
+  
+  // Handle modal close
+  const handleModalClose = () => {
+    setIsAddModalVisible(false);
+  };
+  
+  // Handle adding a new habit
+  const handleAddHabit = async (newHabit: Omit<Habit, 'id' | 'created_at' | 'user_id'>) => {
+    try {
+      await addHabitMutation.mutateAsync(newHabit);
+      setIsAddModalVisible(false);
+    } catch (err) {
+      console.error('Error adding habit:', err);
+      Alert.alert('Error', 'Failed to add habit');
+    }
+  };
+
+  // Handle toggling a habit's selection state
   const handleToggleHabit = async (habitId: string, isSelected: boolean): Promise<void> => {
-    const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       throw new Error('Not authenticated');
     }
 
-    const today = new Date().toISOString().split('T')[0];
-    
-    if (isSelected) {
-      // Add a new habit_data entry
-      const { error: insertError } = await supabase
-        .from('habit_data')
-        .insert([{ 
-          habit_id: habitId,
-          user_id: session.user.id,
-          date: today
-        }]);
-      
-      if (insertError) throw insertError;
-    } else {
-      // Remove the habit_data entry
-      const { error: deleteError } = await supabase
-        .from('habit_data')
-        .delete()
-        .eq('habit_id', habitId)
-        .eq('date', today);
+    try {
+      if (isSelected) {
+        // Add to habit_data
+        const { error } = await supabase
+          .from('habit_data')
+          .insert([
+            { 
+              habit_id: habitId, 
+              date: today,
+              user_id: session.user.id 
+            }
+          ]);
         
-      if (deleteError) throw deleteError;
-    }
-    
-    // Update local state
-    setCategories(prevCategories => 
-      prevCategories.map(category => ({
-        ...category,
-        habits: category.habits.map(habit => 
-          habit.id === habitId ? { ...habit, isSelected } : habit
-        )
-      }))
-    );
-    
-    // No return value needed as we're using Promise<void>
-  };
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
-
-  const fetchHabits = async (): Promise<void> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // Get today's date in YYYY-MM-DD format
-      const today = new Date().toISOString().split('T')[0];
-      
-      // Get the current user session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Not authenticated');
+        if (error) throw error;
+      } else {
+        // Remove from habit_data
+        const { error } = await supabase
+          .from('habit_data')
+          .delete()
+          .eq('habit_id', habitId)
+          .eq('date', today)
+          .eq('user_id', session.user.id);
+        
+        if (error) throw error;
       }
-
-      // Fetch all habits for the user
-      const { data: habitsData, error: habitsError } = await supabase
-        .from('habits')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: true });
-
-      if (habitsError) throw habitsError;
-
-      // Fetch today's completed habits
-      const { data: completedHabits, error: completedError } = await supabase
-        .from('habit_data')
-        .select('habit_id')
-        .eq('date', today)
-        .eq('user_id', session.user.id);
-
-      if (completedError) throw completedError;
-
-      // Create a set of completed habit IDs for quick lookup
-      const completedHabitIds = new Set(completedHabits?.map(h => h.habit_id) || []);
-
-      // Transform the data into the format expected by the UI
-      const habitsByCategory = (habitsData || []).reduce<Record<string, Habit[]>>((acc, habit) => {
-        if (!acc[habit.category]) {
-          acc[habit.category] = [];
-        }
-        acc[habit.category].push({
-          id: habit.id,
-          name: habit.name,
-          category: habit.category,
-          color: habit.color,
-          isSelected: completedHabitIds.has(habit.id)
-        });
-        return acc;
-      }, {});
-
-      // Define category titles and ensure they match the HabitCategory type
-      type CategoryId = 'outer' | 'middle' | 'inner';
-      const categoryTitles: Record<CategoryId, string> = {
-        outer: 'Outer Circle',
-        middle: 'Middle Circle',
-        inner: 'Inner Circle'
-      };
-
-      // Initialize all categories with their habits
-      const loadedCategories: HabitCategory[] = (['outer', 'middle', 'inner'] as const)
-        .map((id) => ({
-          id,
-          title: categoryTitles[id],
-          habits: habitsByCategory[id] || []
-        }));
-
-      setCategories(loadedCategories);
+      
+      // Update local state
+      setSelectedHabits(prevSelectedHabits => ({
+        ...prevSelectedHabits,
+        [habitId]: isSelected
+      }));
     } catch (err) {
-      console.error('Error fetching habits:', err);
-      setError('Failed to load habits. Please try again.');
-      throw err; // Re-throw the error so callers can handle it
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Load habits when component mounts
-  useEffect(() => {
-    fetchHabits();
-  }, []);
-
-  // Refresh habits when the modal is closed
-  const handleModalClose = () => {
-    setIsAddModalVisible(false);
-    fetchHabits();
-  };
-
-  const handleAddHabit = async (newHabit: Omit<Habit, 'id'>) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        Alert.alert('Error', 'You must be logged in to add habits');
-        return;
-      }
-
-      // Ensure all required fields are present
-      const habitToAdd = {
-        name: newHabit.name,
-        category: newHabit.category,
-        color: newHabit.color,
-        user_id: session.user.id,
-      };
-
-      const { data, error } = await supabase
-        .from('habits')
-        .insert([habitToAdd])
-        .select();
-
-      if (error) throw error;
-
-      // Refresh the habits list
-      fetchHabits();
-    } catch (err) {
-      console.error('Error adding habit:', err);
-      Alert.alert('Error', 'Failed to add habit');
+      console.error('Error toggling habit:', err);
+      throw err;
     }
   };
 
@@ -546,8 +464,8 @@ export default function HomeScreen() {
             </YStack>
           ) : error ? (
             <YStack flex={1} justifyContent="center" alignItems="center" space="$2" paddingVertical="$8">
-              <Text color="$red10">{error}</Text>
-              <Button onPress={fetchHabits}>
+              <Text color="$red10">Failed to load habits</Text>
+              <Button onPress={() => window.location.reload()}>
                 <Text>Retry</Text>
               </Button>
             </YStack>
