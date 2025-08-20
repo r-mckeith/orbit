@@ -526,7 +526,7 @@ export default function HomeScreen() {
             <Button 
               circular 
               size="$4" 
-              icon={<Plus size="$lg" />} 
+              icon={<Plus size={'$7'} strokeWidth={3} />} 
               onPress={() => setIsAddModalVisible(true)}
               backgroundColor="$blue10"
               color="white"
