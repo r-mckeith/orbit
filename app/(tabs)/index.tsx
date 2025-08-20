@@ -4,9 +4,9 @@ import { Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card, H2, H4, Input, Text, View, XStack, YStack, styled } from 'tamagui';
 
+import { useAddHabit, useHabitCategories, useHabits } from '../../hooks/useHabits';
 import { supabase } from '../../lib/supabase';
 import { Habit, HabitCategory } from '../../types/habits';
-import { useHabits, useAddHabit, useHabitCategories } from '../../hooks/useHabits';
 
 // Styled component for habit pills
 const HabitPill = styled(View, {
@@ -202,7 +202,7 @@ const AddHabitModal = ({ visible, onClose, onAddHabit }: {
             <YStack gap={8}>
               <Input
                 id="habitName"
-                placeholder="e.g., Drink 8 glasses of water"
+                placeholder=""
                 value={habitName}
                 onChangeText={setHabitName}
                 autoFocus
@@ -219,7 +219,8 @@ const AddHabitModal = ({ visible, onClose, onAddHabit }: {
               />
             </YStack>
             
-            <YStack gap={10}>              
+            <YStack gap={10}>
+              {/* Outer Circle Button */}
               <Button
                 width="100%"
                 height={44}
@@ -227,96 +228,131 @@ const AddHabitModal = ({ visible, onClose, onAddHabit }: {
                 onPress={() => setSelectedCategory('outer')}
                 backgroundColor={
                   selectedCategory === 'outer' 
-                    ? getDefaultColorForCategory('outer') + '20' 
+                    ? `${getDefaultColorForCategory('outer', true)}20` 
                     : '$backgroundHover'
                 }
                 borderWidth={1.5}
                 borderColor={
                   selectedCategory === 'outer' 
-                    ? getDefaultColorForCategory('outer')
+                    ? getDefaultColorForCategory('outer', true)
                     : '$borderColor'
                 }
                 paddingHorizontal={12}
                 alignItems="center"
                 justifyContent="center"
+                pressStyle={{
+                  backgroundColor: selectedCategory === 'outer' 
+                    ? `${getDefaultColorForCategory('outer', true)}30` 
+                    : '$backgroundHover'
+                }}
               >
                 <Text 
                   fontSize={14}
                   fontWeight={selectedCategory === 'outer' ? '600' : '500'}
-                  color={selectedCategory === 'outer' 
-                    ? getDefaultColorForCategory('outer')
-                    : '$color'}
+                  color={
+                    selectedCategory === 'outer' 
+                      ? getDefaultColorForCategory('outer', true)
+                      : '$color'
+                  }
                 >
                   Outer
                 </Text>
               </Button>
               
+              {/* Middle and Inner Circle Buttons */}
               <XStack gap={10} width="100%">
-                {(['middle', 'inner'] as const).map((category) => (
-                  <Button
-                    key={category}
-                    flex={1}
-                    height={44}
-                    borderRadius={10}
-                    onPress={() => setSelectedCategory(category)}
-                    backgroundColor={
-                      selectedCategory === category 
-                        ? getDefaultColorForCategory(category) + '20' 
-                        : '$backgroundHover'
-                    }
-                    borderWidth={1.5}
-                    borderColor={
-                      selectedCategory === category 
-                        ? getDefaultColorForCategory(category)
-                        : '$borderColor'
-                    }
-                    paddingHorizontal={12}
-                    alignItems="center"
-                    justifyContent="center"
-                  >
-                    <Text 
-                      fontSize={14}
-                      fontWeight={selectedCategory === category ? '600' : '500'}
-                      color={selectedCategory === category 
-                        ? getDefaultColorForCategory(category)
-                        : '$color'}
+                {(['middle', 'inner'] as const).map((category) => {
+                  const isSelected = selectedCategory === category;
+                  const categoryColor = getDefaultColorForCategory(category, true);
+                  
+                  return (
+                    <Button
+                      key={category}
+                      flex={1}
+                      height={44}
+                      borderRadius={10}
+                      onPress={() => setSelectedCategory(category)}
+                      backgroundColor={
+                        isSelected 
+                          ? `${categoryColor}20` 
+                          : '$backgroundHover'
+                      }
+                      borderWidth={1.5}
+                      borderColor={
+                        isSelected 
+                          ? categoryColor
+                          : '$borderColor'
+                      }
+                      alignItems="center"
+                      justifyContent="center"
+                      pressStyle={{
+                        backgroundColor: isSelected 
+                          ? `${categoryColor}30` 
+                          : '$backgroundHover'
+                      }}
                     >
-                      {category.charAt(0).toUpperCase() + category.slice(1)}
-                    </Text>
-                  </Button>
-                ))}
+                      <Text 
+                        fontSize={14}
+                        fontWeight={isSelected ? '600' : '500'}
+                        color={
+                          isSelected 
+                            ? categoryColor
+                            : '$color'
+                        }
+                      >
+                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                      </Text>
+                    </Button>
+                  );
+                })}
               </XStack>
             </YStack>
           </YStack>
 
           <XStack 
             gap={12}
-            justifyContent="flex-end"
+            justifyContent="space-between"
             paddingTop={16}
+            width="100%"
           >
             <Button 
-              size='$4'
               onPress={onClose}
-              backgroundColor="$backgroundHover"
-              borderWidth={0}
-              paddingHorizontal={20}
-              height={48}
-              borderRadius={12}
+              paddingHorizontal={16}
+              height={44}
+              borderRadius={10}
+              flex={1}
+              alignItems="center"
+              justifyContent="center"
+              pressStyle={{
+                backgroundColor: '$backgroundHover'
+              }}
             >
-              <Text fontSize={16} fontWeight="500">Cancel</Text>
+              <Text fontSize={14} fontWeight="500" color="$color">
+                Cancel
+              </Text>
             </Button>
             <Button 
-              size='$4'
               onPress={handleSubmit}
-              backgroundColor={getDefaultColorForCategory(selectedCategory)}
-              borderWidth={0}
-              paddingHorizontal={24}
-              height={48}
-              borderRadius={12}
+              backgroundColor={`${getDefaultColorForCategory(selectedCategory, true)}20`}
+              borderWidth={1.5}
+              borderColor={getDefaultColorForCategory(selectedCategory, true)}
+              paddingHorizontal={16}
+              height={44}
+              borderRadius={10}
+              flex={1}
+              alignItems="center"
+              justifyContent="center"
               disabled={!habitName.trim()}
               opacity={!habitName.trim() ? 0.5 : 1}
+              pressStyle={{
+                backgroundColor: `${getDefaultColorForCategory(selectedCategory, true)}30`
+              }}
             >
-              <Text fontSize={16} fontWeight="600" color="white">
+              <Text 
+                fontSize={14} 
+                fontWeight="600" 
+                color={getDefaultColorForCategory(selectedCategory, true)}
+              >
                 Add Habit
               </Text>
             </Button>
