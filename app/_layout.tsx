@@ -5,11 +5,15 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { TamaguiProvider } from 'tamagui';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import useColorScheme from '@/hooks/useColorScheme';
+import { AuthProvider, useAuth } from '../contexts/AuthContext';
+import useColorScheme from '../hooks/useColorScheme';
 import { Platform } from 'react-native';
 import config from '../tamagui.config';
+
+// Create a client for React Query
+const queryClient = new QueryClient();
 
 // Use the same pattern as in (tabs)/_layout.tsx
 const useAppColorScheme = (): 'light' | 'dark' => {
@@ -64,13 +68,15 @@ export default function RootLayout() {
   const theme = colorScheme || 'light';
   
   return (
-    <TamaguiProvider config={config} defaultTheme={theme}>
-      <NavigationThemeProvider value={theme === 'dark' ? DarkTheme : DefaultTheme}>
-        <AuthProvider>
-          <RootLayoutNav />
-          <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-        </AuthProvider>
-      </NavigationThemeProvider>
-    </TamaguiProvider>
+    <QueryClientProvider client={queryClient}>
+      <TamaguiProvider config={config} defaultTheme={theme}>
+        <NavigationThemeProvider value={theme === 'dark' ? DarkTheme : DefaultTheme}>
+          <AuthProvider>
+            <RootLayoutNav />
+            <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+          </AuthProvider>
+        </NavigationThemeProvider>
+      </TamaguiProvider>
+    </QueryClientProvider>
   );
 }

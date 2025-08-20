@@ -1,11 +1,13 @@
 import { Plus } from '@tamagui/lucide-icons';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, ScrollView } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card, H2, H4, Input, Text, View, XStack, YStack, styled } from 'tamagui';
 
-import { supabase } from '@/lib/supabase';
-import { Habit, HabitCategory } from '@/types/habits';
+import { HABITS_QUERY_KEY, useAddHabit, useHabitCategories, useHabits } from '../../hooks/useHabits';
+import { supabase } from '../../lib/supabase';
+import { Habit, HabitCategory } from '../../types/habits';
 
 // Styled component for habit pills
 const HabitPill = styled(View, {
@@ -35,19 +37,56 @@ const HabitPillComponent = ({
   onToggleHabit
 }: HabitPillComponentProps) => {
   const [isToggling, setIsToggling] = useState(false);
-  const color = getDefaultColorForCategory(habit.category, habit.isSelected);
+  const [localIsSelected, setLocalIsSelected] = useState(habit.isSelected ?? false);
+  
+  // Update local state when the prop changes
+  useEffect(() => {
+    console.log('Habit prop changed', { habitId: habit.id, isSelected: habit.isSelected });
+    setLocalIsSelected(prev => {
+      // Only update if the value has actually changed
+      if (habit.isSelected !== undefined && habit.isSelected !== prev) {
+        console.log('Updating local isSelected state from prop', { prev, new: habit.isSelected });
+        return habit.isSelected;
+      }
+      return prev;
+    });
+  }, [habit.isSelected]);
+  
+  // Use a ref to track the current value to avoid stale closures
+  const isSelectedRef = useRef(localIsSelected);
+  isSelectedRef.current = localIsSelected;
+  
+  const color = getDefaultColorForCategory(habit.category, localIsSelected);
   
   const toggleHabitSelection = async () => {
-    if (isToggling) return; // Prevent double-taps
+    const newState = !localIsSelected;
+    console.log('toggleHabitSelection called', { 
+      habitId: habit.id, 
+      currentState: localIsSelected,
+      newState 
+    });
     
+    if (isToggling) {
+      console.log('Already toggling, ignoring');
+      return; // Prevent double-taps
+    }
+    
+    // Optimistically update the UI
+    setLocalIsSelected(newState);
     setIsToggling(true);
     
     try {
-      // The optimistic update is handled by the parent component
-      // No need to fetch habits again as we're updating optimistically
-      await onToggleHabit(habit.id, !habit.isSelected);
+      console.log('Calling onToggleHabit with', { 
+        habitId: habit.id, 
+        isSelected: newState 
+      });
+      
+      await onToggleHabit(habit.id, newState);
+      console.log('onToggleHabit completed successfully');
     } catch (err) {
       console.error('Error toggling habit selection:', err);
+      // Revert optimistic update on error
+      setLocalIsSelected(!newState);
       Alert.alert('Error', 'Failed to update habit tracking');
     } finally {
       setIsToggling(false);
@@ -55,22 +94,24 @@ const HabitPillComponent = ({
   };
   
   return (
-    <HabitPill 
-      key={habit.id}
-      onPress={toggleHabitSelection}
-      style={{
-        backgroundColor: habit.isSelected ? `${color}20` : '#f1f1f1',
-        borderWidth: 1,
-        borderColor: habit.isSelected ? `${color}40` : '#e0e0e0',
-      }}
-    >
-      <HabitPillText style={{ 
-        color: habit.isSelected ? color : '#333',
-        opacity: habit.isSelected ? 1 : 0.9
-      }}>
-        {habit.name}
-      </HabitPillText>
-    </HabitPill>
+    <Pressable onPress={toggleHabitSelection} disabled={isToggling}>
+      <HabitPill 
+        key={habit.id}
+        style={{
+          backgroundColor: localIsSelected ? `${color}20` : '#f1f1f1',
+          borderWidth: 1,
+          borderColor: localIsSelected ? `${color}40` : '#e0e0e0',
+          opacity: isToggling ? 0.7 : 1,
+        }}
+      >
+        <HabitPillText style={{ 
+          color: localIsSelected ? color : '#333',
+          opacity: localIsSelected ? 1 : 0.9
+        }}>
+          {habit.name}
+        </HabitPillText>
+      </HabitPill>
+    </Pressable>
   );
 };
 
@@ -174,18 +215,24 @@ const AddHabitModal = ({ visible, onClose, onAddHabit }: {
       backgroundColor="$background"
       justifyContent="center"
       alignItems="center"
-      padding={32}
+      padding={Platform.select({ ios: 16, android: 32 })}
       display={visible ? 'flex' : 'none'}
     >
-      <Card 
-        width="100%" 
-        maxWidth={500}
-        backgroundColor="$background"
-        borderWidth={1}
-        borderColor="$borderColor"
-        elevation={0}
-        marginHorizontal={16}
+      <KeyboardAvoidingView 
+        style={{ width: '100%', flex: 1, justifyContent: 'center' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
       >
+        <Card 
+          width="100%" 
+          maxWidth={500}
+          backgroundColor="$background"
+          borderWidth={1}
+          borderColor="$borderColor"
+          elevation={0}
+          marginHorizontal={Platform.OS === 'ios' ? 0 : 16}
+          alignSelf="center"
+        >
         <YStack paddingHorizontal={20} paddingVertical={20} gap={24}>
           <YStack gap={8}>
             <H2 fontSize={24} fontWeight="600">New Habit</H2>
@@ -195,7 +242,7 @@ const AddHabitModal = ({ visible, onClose, onAddHabit }: {
             <YStack gap={8}>
               <Input
                 id="habitName"
-                placeholder="e.g., Drink 8 glasses of water"
+                placeholder=""
                 value={habitName}
                 onChangeText={setHabitName}
                 autoFocus
@@ -212,7 +259,8 @@ const AddHabitModal = ({ visible, onClose, onAddHabit }: {
               />
             </YStack>
             
-            <YStack gap={10}>              
+            <YStack gap={10}>
+              {/* Outer Circle Button */}
               <Button
                 width="100%"
                 height={44}
@@ -220,102 +268,138 @@ const AddHabitModal = ({ visible, onClose, onAddHabit }: {
                 onPress={() => setSelectedCategory('outer')}
                 backgroundColor={
                   selectedCategory === 'outer' 
-                    ? getDefaultColorForCategory('outer') + '20' 
+                    ? `${getDefaultColorForCategory('outer', true)}20` 
                     : '$backgroundHover'
                 }
                 borderWidth={1.5}
                 borderColor={
                   selectedCategory === 'outer' 
-                    ? getDefaultColorForCategory('outer')
+                    ? getDefaultColorForCategory('outer', true)
                     : '$borderColor'
                 }
                 paddingHorizontal={12}
                 alignItems="center"
                 justifyContent="center"
+                pressStyle={{
+                  backgroundColor: selectedCategory === 'outer' 
+                    ? `${getDefaultColorForCategory('outer', true)}30` 
+                    : '$backgroundHover'
+                }}
               >
                 <Text 
                   fontSize={14}
                   fontWeight={selectedCategory === 'outer' ? '600' : '500'}
-                  color={selectedCategory === 'outer' 
-                    ? getDefaultColorForCategory('outer')
-                    : '$color'}
+                  color={
+                    selectedCategory === 'outer' 
+                      ? getDefaultColorForCategory('outer', true)
+                      : '$color'
+                  }
                 >
                   Outer
                 </Text>
               </Button>
               
+              {/* Middle and Inner Circle Buttons */}
               <XStack gap={10} width="100%">
-                {(['middle', 'inner'] as const).map((category) => (
-                  <Button
-                    key={category}
-                    flex={1}
-                    height={44}
-                    borderRadius={10}
-                    onPress={() => setSelectedCategory(category)}
-                    backgroundColor={
-                      selectedCategory === category 
-                        ? getDefaultColorForCategory(category) + '20' 
-                        : '$backgroundHover'
-                    }
-                    borderWidth={1.5}
-                    borderColor={
-                      selectedCategory === category 
-                        ? getDefaultColorForCategory(category)
-                        : '$borderColor'
-                    }
-                    paddingHorizontal={12}
-                    alignItems="center"
-                    justifyContent="center"
-                  >
-                    <Text 
-                      fontSize={14}
-                      fontWeight={selectedCategory === category ? '600' : '500'}
-                      color={selectedCategory === category 
-                        ? getDefaultColorForCategory(category)
-                        : '$color'}
+                {(['middle', 'inner'] as const).map((category) => {
+                  const isSelected = selectedCategory === category;
+                  const categoryColor = getDefaultColorForCategory(category, true);
+                  
+                  return (
+                    <Button
+                      key={category}
+                      flex={1}
+                      height={44}
+                      borderRadius={10}
+                      onPress={() => setSelectedCategory(category)}
+                      backgroundColor={
+                        isSelected 
+                          ? `${categoryColor}20` 
+                          : '$backgroundHover'
+                      }
+                      borderWidth={1.5}
+                      borderColor={
+                        isSelected 
+                          ? categoryColor
+                          : '$borderColor'
+                      }
+                      alignItems="center"
+                      justifyContent="center"
+                      pressStyle={{
+                        backgroundColor: isSelected 
+                          ? `${categoryColor}30` 
+                          : '$backgroundHover'
+                      }}
                     >
-                      {category.charAt(0).toUpperCase() + category.slice(1)}
-                    </Text>
-                  </Button>
-                ))}
+                      <Text 
+                        fontSize={14}
+                        fontWeight={isSelected ? '600' : '500'}
+                        color={
+                          isSelected 
+                            ? categoryColor
+                            : '$color'
+                        }
+                      >
+                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                      </Text>
+                    </Button>
+                  );
+                })}
               </XStack>
             </YStack>
           </YStack>
 
           <XStack 
             gap={12}
-            justifyContent="flex-end"
+            justifyContent="space-between"
             paddingTop={16}
+            width="100%"
           >
             <Button 
-              size='$4'
               onPress={onClose}
-              backgroundColor="$backgroundHover"
-              borderWidth={0}
-              paddingHorizontal={20}
-              height={48}
-              borderRadius={12}
+              paddingHorizontal={16}
+              height={44}
+              borderRadius={10}
+              flex={1}
+              alignItems="center"
+              justifyContent="center"
+              pressStyle={{
+                backgroundColor: '$backgroundHover'
+              }}
             >
-              <Text fontSize={16} fontWeight="500">Cancel</Text>
+              <Text fontSize={14} fontWeight="500" color="$color">
+                Cancel
+              </Text>
             </Button>
             <Button 
-              size='$4'
               onPress={handleSubmit}
-              backgroundColor={getDefaultColorForCategory(selectedCategory)}
-              borderWidth={0}
-              paddingHorizontal={24}
-              height={48}
-              borderRadius={12}
+              backgroundColor={`${getDefaultColorForCategory(selectedCategory, true)}20`}
+              borderWidth={1.5}
+              borderColor={getDefaultColorForCategory(selectedCategory, true)}
+              paddingHorizontal={16}
+              height={44}
+              borderRadius={10}
+              flex={1}
+              alignItems="center"
+              justifyContent="center"
               disabled={!habitName.trim()}
               opacity={!habitName.trim() ? 0.5 : 1}
+              pressStyle={{
+                backgroundColor: `${getDefaultColorForCategory(selectedCategory, true)}30`
+              }}
             >
-              <Text fontSize={16} fontWeight="600" color="white">
+              <Text 
+                fontSize={14} 
+                fontWeight="600" 
+                color={getDefaultColorForCategory(selectedCategory, true)}
+              >
                 Add Habit
               </Text>
             </Button>
           </XStack>
-        </YStack>
-      </Card>
+          </YStack>
+        </Card>
+      </KeyboardAvoidingView>
     </View>
   );
 };
@@ -344,172 +428,158 @@ interface SupabaseHabit {
   user_id: string;
 }
 
+interface Session {
+  user: {
+    id: string;
+    // Add other user properties as needed
+  };
+  // Add other session properties as needed
+}
+
 export default function HomeScreen() {
-  const scrollViewRef = useRef<ScrollView>(null);
-  const [categories, setCategories] = useState<HabitCategory[]>([]);
-  
-  // Function to handle toggling a habit's selection state
-  const handleToggleHabit = async (habitId: string, isSelected: boolean): Promise<void> => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      throw new Error('Not authenticated');
-    }
-
-    const today = new Date().toISOString().split('T')[0];
-    
-    if (isSelected) {
-      // Add a new habit_data entry
-      const { error: insertError } = await supabase
-        .from('habit_data')
-        .insert([{ 
-          habit_id: habitId,
-          user_id: session.user.id,
-          date: today
-        }]);
-      
-      if (insertError) throw insertError;
-    } else {
-      // Remove the habit_data entry
-      const { error: deleteError } = await supabase
-        .from('habit_data')
-        .delete()
-        .eq('habit_id', habitId)
-        .eq('date', today);
-        
-      if (deleteError) throw deleteError;
-    }
-    
-    // Update local state
-    setCategories(prevCategories => 
-      prevCategories.map(category => ({
-        ...category,
-        habits: category.habits.map(habit => 
-          habit.id === habitId ? { ...habit, isSelected } : habit
-        )
-      }))
-    );
-    
-    // No return value needed as we're using Promise<void>
-  };
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
-
-  const fetchHabits = async (): Promise<void> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // Get today's date in YYYY-MM-DD format
-      const today = new Date().toISOString().split('T')[0];
-      
-      // Get the current user session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Not authenticated');
-      }
-
-      // Fetch all habits for the user
-      const { data: habitsData, error: habitsError } = await supabase
-        .from('habits')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: true });
-
-      if (habitsError) throw habitsError;
-
-      // Fetch today's completed habits
-      const { data: completedHabits, error: completedError } = await supabase
-        .from('habit_data')
-        .select('habit_id')
-        .eq('date', today)
-        .eq('user_id', session.user.id);
-
-      if (completedError) throw completedError;
-
-      // Create a set of completed habit IDs for quick lookup
-      const completedHabitIds = new Set(completedHabits?.map(h => h.habit_id) || []);
-
-      // Transform the data into the format expected by the UI
-      const habitsByCategory = (habitsData || []).reduce<Record<string, Habit[]>>((acc, habit) => {
-        if (!acc[habit.category]) {
-          acc[habit.category] = [];
-        }
-        acc[habit.category].push({
-          id: habit.id,
-          name: habit.name,
-          category: habit.category,
-          color: habit.color,
-          isSelected: completedHabitIds.has(habit.id)
-        });
-        return acc;
-      }, {});
-
-      // Define category titles and ensure they match the HabitCategory type
-      type CategoryId = 'outer' | 'middle' | 'inner';
-      const categoryTitles: Record<CategoryId, string> = {
-        outer: 'Outer Circle',
-        middle: 'Middle Circle',
-        inner: 'Inner Circle'
-      };
-
-      // Initialize all categories with their habits
-      const loadedCategories: HabitCategory[] = (['outer', 'middle', 'inner'] as const)
-        .map((id) => ({
-          id,
-          title: categoryTitles[id],
-          habits: habitsByCategory[id] || []
-        }));
-
-      setCategories(loadedCategories);
-    } catch (err) {
-      console.error('Error fetching habits:', err);
-      setError('Failed to load habits. Please try again.');
-      throw err; // Re-throw the error so callers can handle it
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Load habits when component mounts
+  const [selectedHabits, setSelectedHabits] = useState<Record<string, boolean>>({});
+  const scrollViewRef = useRef<ScrollView>(null);
+  
+  // Get the current user session
+  const [session, setSession] = useState<Session | null>(null);
+  const today = new Date().toISOString().split('T')[0];
+  const queryClient = useQueryClient();
+  
   useEffect(() => {
-    fetchHabits();
+    const getSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      setSession(data.session as Session | null);
+    };
+    
+    getSession();
   }, []);
-
-  // Refresh habits when the modal is closed
+  
+  // Fetch habits using TanStack Query
+  const { data: habits = [], isLoading, error } = useHabits(session?.user?.id || '');
+  
+  // Get categories with their associated habits
+  const { data: categories = [] } = useHabitCategories(habits);
+  
+  // Mutation for adding a new habit
+  const addHabitMutation = useAddHabit();
+  
+  // Handle modal close
   const handleModalClose = () => {
     setIsAddModalVisible(false);
-    fetchHabits();
   };
-
-  const handleAddHabit = async (newHabit: Omit<Habit, 'id'>) => {
+  
+  // Handle adding a new habit
+  const handleAddHabit = async (newHabit: Omit<Habit, 'id' | 'created_at' | 'user_id'>) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        Alert.alert('Error', 'You must be logged in to add habits');
-        return;
-      }
-
-      // Ensure all required fields are present
-      const habitToAdd = {
-        name: newHabit.name,
-        category: newHabit.category,
-        color: newHabit.color,
-        user_id: session.user.id,
-      };
-
-      const { data, error } = await supabase
-        .from('habits')
-        .insert([habitToAdd])
-        .select();
-
-      if (error) throw error;
-
-      // Refresh the habits list
-      fetchHabits();
+      await addHabitMutation.mutateAsync(newHabit);
+      setIsAddModalVisible(false);
     } catch (err) {
       console.error('Error adding habit:', err);
       Alert.alert('Error', 'Failed to add habit');
+    }
+  };
+
+  // Mutation for toggling habit selection with optimistic updates
+  const toggleHabitMutation = useMutation({
+    mutationFn: async ({ habitId, isSelected }: { habitId: string; isSelected: boolean }) => {
+      console.log('mutationFn called', { habitId, isSelected });
+      
+      if (!session) {
+        console.error('No session found');
+        throw new Error('Not authenticated');
+      }
+
+      if (isSelected) {
+        console.log('Adding habit to habit_data');
+        // Add to habit_data
+        const { data, error } = await supabase
+          .from('habit_data')
+          .insert([
+            { 
+              habit_id: habitId, 
+              date: today,
+              user_id: session.user.id 
+            }
+          ])
+          .select();
+        
+        console.log('Insert result', { data, error });
+        
+        if (error && error.code !== '23505') { // Ignore duplicate key errors
+          console.error('Error inserting habit data:', error);
+          throw error;
+        }
+        console.log('Habit added successfully');
+      } else {
+        console.log('Removing habit from habit_data');
+        // Remove from habit_data
+        const { error, count } = await supabase
+          .from('habit_data')
+          .delete()
+          .eq('habit_id', habitId)
+          .eq('date', today)
+          .eq('user_id', session.user.id);
+        
+        console.log('Delete result', { error, count });
+        
+        if (error) {
+          console.error('Error deleting habit data:', error);
+          throw error;
+        }
+        console.log('Habit removed successfully');
+      }
+      return { habitId, isSelected };
+    },
+    // Optimistic update
+    onMutate: async ({ habitId, isSelected }) => {
+      console.log('onMutate called', { habitId, isSelected });
+      
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({ queryKey: [HABITS_QUERY_KEY, session?.user.id] });
+
+      // Snapshot the previous value
+      const previousHabits = queryClient.getQueryData<Habit[]>([HABITS_QUERY_KEY, session?.user.id]);
+      console.log('Previous habits:', previousHabits);
+
+      // Optimistically update to the new value
+      if (previousHabits) {
+        const updatedHabits = previousHabits.map(habit => 
+          habit.id === habitId 
+            ? { ...habit, isSelected } 
+            : habit
+        );
+        
+        console.log('Setting query data with updated habits:', updatedHabits);
+        queryClient.setQueryData<Habit[]>([HABITS_QUERY_KEY, session?.user.id], updatedHabits);
+      }
+
+      // Return a context object with the snapshotted value
+      return { previousHabits };
+    },
+    // If the mutation fails, use the context returned from onMutate to roll back
+    onError: (err, variables, context) => {
+      console.error('Mutation failed, rolling back', err);
+      if (context?.previousHabits) {
+        queryClient.setQueryData([HABITS_QUERY_KEY], context.previousHabits);
+      }
+    },
+    // Always refetch after error or success:
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: [HABITS_QUERY_KEY] });
+    },
+  });
+
+  // Handle toggling a habit's selection state
+  const handleToggleHabit = async (habitId: string, isSelected: boolean): Promise<void> => {
+    console.log('handleToggleHabit called', { habitId, isSelected });
+    try {
+      console.log('Calling toggleHabitMutation.mutateAsync');
+      const result = await toggleHabitMutation.mutateAsync({ habitId, isSelected });
+      console.log('toggleHabitMutation completed', { result });
+    } catch (err) {
+      console.error('Error in handleToggleHabit:', err);
+      throw err;
     }
   };
 
@@ -522,11 +592,11 @@ export default function HomeScreen() {
       >
         <ContentContainer>
           <XStack justifyContent="space-between" alignItems="center" marginBottom="$4">
-            <Title>Circles</Title>
+            <H2>Circles</H2>
             <Button 
               circular 
               size="$4" 
-              icon={<Plus size="$lg" />} 
+              icon={<Plus size={'$7'} strokeWidth={3} />} 
               onPress={() => setIsAddModalVisible(true)}
               backgroundColor="$blue10"
               color="white"
@@ -539,8 +609,8 @@ export default function HomeScreen() {
             </YStack>
           ) : error ? (
             <YStack flex={1} justifyContent="center" alignItems="center" space="$2" paddingVertical="$8">
-              <Text color="$red10">{error}</Text>
-              <Button onPress={fetchHabits}>
+              <Text color="$red10">Failed to load habits</Text>
+              <Button onPress={() => window.location.reload()}>
                 <Text>Retry</Text>
               </Button>
             </YStack>

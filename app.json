@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "circles",
+    "name": "Three Circles App",
     "slug": "circles",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,8 +8,16 @@
     "scheme": "circles",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "assetBundlePatterns": [
+      "**/*",
+      "node_modules/@tamagui/lucide-icons/feather/*.ttf"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rmckeith.circles",
+      "infoPlist": {
+        "CFBundleDisplayName": "Circles"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -38,6 +46,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3bdaf9e7-b766-4419-89d4-a82626261291"
+      }
     }
   }
 }
