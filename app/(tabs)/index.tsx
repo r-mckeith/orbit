@@ -1,6 +1,6 @@
 import { Plus } from '@tamagui/lucide-icons';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, ScrollView } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card, H2, H4, Input, Text, View, XStack, YStack, styled } from 'tamagui';
 
@@ -174,18 +174,24 @@ const AddHabitModal = ({ visible, onClose, onAddHabit }: {
       backgroundColor="$background"
       justifyContent="center"
       alignItems="center"
-      padding={32}
+      padding={Platform.select({ ios: 16, android: 32 })}
       display={visible ? 'flex' : 'none'}
     >
-      <Card 
-        width="100%" 
-        maxWidth={500}
-        backgroundColor="$background"
-        borderWidth={1}
-        borderColor="$borderColor"
-        elevation={0}
-        marginHorizontal={16}
+      <KeyboardAvoidingView 
+        style={{ width: '100%', flex: 1, justifyContent: 'center' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
       >
+        <Card 
+          width="100%" 
+          maxWidth={500}
+          backgroundColor="$background"
+          borderWidth={1}
+          borderColor="$borderColor"
+          elevation={0}
+          marginHorizontal={Platform.OS === 'ios' ? 0 : 16}
+          alignSelf="center"
+        >
         <YStack paddingHorizontal={20} paddingVertical={20} gap={24}>
           <YStack gap={8}>
             <H2 fontSize={24} fontWeight="600">New Habit</H2>
@@ -314,8 +320,9 @@ const AddHabitModal = ({ visible, onClose, onAddHabit }: {
               </Text>
             </Button>
           </XStack>
-        </YStack>
-      </Card>
+          </YStack>
+        </Card>
+      </KeyboardAvoidingView>
     </View>
   );
 };

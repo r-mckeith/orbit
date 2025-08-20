@@ -1,6 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { Platform, KeyboardAvoidingView, ScrollView } from 'react-native';
 import { Button, Form, Input, Text, XStack, YStack } from 'tamagui';
 
 export default function LoginScreen() {
@@ -32,7 +33,16 @@ export default function LoginScreen() {
   };
 
   return (
-    <YStack f={1} jc="center" p="$6" gap="$6" bg="$background">
+    <KeyboardAvoidingView 
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+    >
+      <ScrollView 
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <YStack f={1} jc="center" p="$6" gap="$6" bg="$background">
       <YStack alignItems="center" gap="$2" mb="$4">
         <Text fontSize="$9" fontWeight="bold" color="$color">
           Welcome Back
@@ -133,5 +143,7 @@ export default function LoginScreen() {
         </YStack>
       </Form>
     </YStack>
+  </ScrollView>
+</KeyboardAvoidingView>
   );
 }
