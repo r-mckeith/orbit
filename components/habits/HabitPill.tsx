@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Pressable } from 'react-native';
+import { Pressable } from 'react-native';
 import { Text, View, styled } from 'tamagui';
 import { Habit, HabitCategory } from '../../types/habits';
 
@@ -22,14 +22,13 @@ const HabitPillText = styled(Text, {
 
 interface HabitPillComponentProps {
   habit: Habit;
-  onToggleHabit: (habitId: string, isSelected: boolean) => Promise<void>;
+  onToggleHabit: (habitId: string) => void;
 }
 
 export default function HabitPillComponent({ 
   habit, 
   onToggleHabit
 }: HabitPillComponentProps) {
-  const [isToggling, setIsToggling] = useState(false);
   const [localIsSelected, setLocalIsSelected] = useState(habit.isSelected ?? false);
   
   // Update local state when the prop changes
@@ -51,50 +50,14 @@ export default function HabitPillComponent({
   
   const color = getDefaultColorForCategory(habit.category, localIsSelected);
   
-  const toggleHabitSelection = async () => {
-    const newState = !localIsSelected;
-    console.log('toggleHabitSelection called', { 
-      habitId: habit.id, 
-      currentState: localIsSelected,
-      newState 
-    });
-    
-    if (isToggling) {
-      console.log('Already toggling, ignoring');
-      return; // Prevent double-taps
-    }
-    
-    // Optimistically update the UI
-    setLocalIsSelected(newState);
-    setIsToggling(true);
-    
-    try {
-      console.log('Calling onToggleHabit with', { 
-        habitId: habit.id, 
-        isSelected: newState 
-      });
-      
-      await onToggleHabit(habit.id, newState);
-      console.log('onToggleHabit completed successfully');
-    } catch (err) {
-      console.error('Error toggling habit selection:', err);
-      // Revert optimistic update on error
-      setLocalIsSelected(!newState);
-      Alert.alert('Error', 'Failed to update habit tracking');
-    } finally {
-      setIsToggling(false);
-    }
-  };
-  
   return (
-    <Pressable onPress={toggleHabitSelection} disabled={isToggling}>
+    <Pressable onPress={() => onToggleHabit(habit.id)}>
       <HabitPill 
         key={habit.id}
         style={{
           backgroundColor: localIsSelected ? `${color}20` : '#f1f1f1',
           borderWidth: 1,
           borderColor: localIsSelected ? `${color}40` : '#e0e0e0',
-          opacity: isToggling ? 0.7 : 1,
         }}
       >
         <HabitPillText style={{ 

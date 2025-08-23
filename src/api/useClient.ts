@@ -1,7 +1,6 @@
-import 'react-native-url-polyfill/auto';
-import * as SecureStore from 'expo-secure-store';
-import Constants from 'expo-constants';
 import { createClient } from '@supabase/supabase-js';
+import * as SecureStore from 'expo-secure-store';
+import 'react-native-url-polyfill/auto';
 
 const ExpoSecureStoreAdapter = {
   getItem: async (key: string): Promise<string | null> => {
@@ -27,6 +26,7 @@ const ExpoSecureStoreAdapter = {
           email: session.user.email
         },
       });
+      console.log(minimalSession);
 
       await SecureStore.setItemAsync(key, minimalSession);
     } catch (error) {
@@ -43,8 +43,8 @@ const ExpoSecureStoreAdapter = {
   },
 };
 
-const supabaseUrl = 'https://qzdyqatdnyqlavwjofwl.supabase.co';
-const SUPABASE_API_KEY = Constants.expoConfig?.extra?.supabaseApiKey || null;
+const supabaseUrl = 'https://ditfloepmylydershdus.supabase.co';
+const SUPABASE_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpdGZsb2VwbXlseWRlcnNoZHVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzODg5ODQsImV4cCI6MjA3MDk2NDk4NH0.vn27-wqNDoDVXyFsDv0-DaQPdMxaleNJcCGbTJj-m6U';
 
 export const supabase = createClient(supabaseUrl, SUPABASE_API_KEY, {
   auth: {

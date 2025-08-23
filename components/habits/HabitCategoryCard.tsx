@@ -27,7 +27,7 @@ const HabitPillsContainer = styled(XStack, {
 
 interface HabitCategoryCardProps {
   category: HabitCategory;
-  onToggleHabit: (habitId: string, isSelected: boolean) => Promise<void>;
+  onToggleHabit: (habitId: string) => void;
 }
 
 export default function HabitCategoryCard({ 

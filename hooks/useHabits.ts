@@ -4,27 +4,25 @@ import { Habit, HabitCategory } from '../types/habits';
 
 export const HABITS_QUERY_KEY = 'habits';
 
-export const useHabits = (userId: string) => {
+export const useHabits = () => {
   return useQuery({
-    queryKey: [HABITS_QUERY_KEY, userId],
+    queryKey: [HABITS_QUERY_KEY],
     queryFn: async () => {
       // Get today's date in the local timezone
       const today = new Date().toISOString().split('T')[0];
       
-      // First, get all habits
+      // Get all habits - RLS will filter by user
       const { data: habits, error: habitsError } = await supabase
         .from('habits')
         .select('*')
-        .eq('user_id', userId)
         .order('created_at', { ascending: true });
 
       if (habitsError) throw habitsError;
       
-      // Then, get today's habit_data
+      // Get today's habit_data - RLS will filter by user
       const { data: habitData, error: dataError } = await supabase
         .from('habit_data')
         .select('habit_id')
-        .eq('user_id', userId)
         .eq('date', today);
 
       if (dataError) throw dataError;
@@ -37,8 +35,7 @@ export const useHabits = (userId: string) => {
         ...habit,
         isSelected: selectedHabitIds.has(habit.id)
       })) as Habit[];
-    },
-    enabled: !!userId,
+    }
   });
 };
 

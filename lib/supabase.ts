@@ -1,66 +1,52 @@
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 import 'react-native-url-polyfill/auto';
-import { Platform } from 'react-native';
-
-// These will be replaced with your actual Supabase URL and anon key
-const supabaseUrl = 'https://ditfloepmylydershdus.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpdGZsb2VwbXlseWRlcnNoZHVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzODg5ODQsImV4cCI6MjA3MDk2NDk4NH0.vn27-wqNDoDVXyFsDv0-DaQPdMxaleNJcCGbTJj-m6U';
 
 const ExpoSecureStoreAdapter = {
-  getItem: async (key: string) => {
+  getItem: async (key: string): Promise<string | null> => {
     try {
       return await SecureStore.getItemAsync(key);
     } catch (error) {
-      console.error('Error reading from SecureStore:', error);
+      console.error(`Error getting item for key "${key}":`, error);
       return null;
     }
   },
-  setItem: async (key: string, value: string) => {
+
+  setItem: async (key: string, value: string): Promise<void> => {
     try {
-      await SecureStore.setItemAsync(key, value);
+      const session = JSON.parse(value);
+      const minimalSession = JSON.stringify({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+        expires_at: session.expires_at,
+        user: {
+          id: session.user.id,
+          email: session.user.email
+        },
+      });
+      await SecureStore.setItemAsync(key, minimalSession);
     } catch (error) {
-      console.error('Error writing to SecureStore:', error);
+      console.error(`Error setting item for key "${key}":`, error);
     }
   },
-  removeItem: async (key: string) => {
+
+  removeItem: async (key: string): Promise<void> => {
     try {
       await SecureStore.deleteItemAsync(key);
     } catch (error) {
-      console.error('Error removing from SecureStore:', error);
+      console.error(`Error removing item for key "${key}":`, error);
     }
   },
 };
 
-// Use different storage based on platform
-const storage = Platform.OS === 'web' 
-  ? {
-      getItem: (key: string) => {
-        if (typeof window !== 'undefined') {
-          return Promise.resolve(localStorage.getItem(key));
-        }
-        return Promise.resolve(null);
-      },
-      setItem: (key: string, value: string) => {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(key, value);
-        }
-        return Promise.resolve();
-      },
-      removeItem: (key: string) => {
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem(key);
-        }
-        return Promise.resolve();
-      },
-    }
-  : ExpoSecureStoreAdapter;
+const supabaseUrl = 'https://ditfloepmylydershdus.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpdGZsb2VwbXlseWRlcnNoZHVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzODg5ODQsImV4cCI6MjA3MDk2NDk4NH0.vn27-wqNDoDVXyFsDv0-DaQPdMxaleNJcCGbTJj-m6U';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage,
+    storage: ExpoSecureStoreAdapter as any,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: Platform.OS === 'web',
+    detectSessionInUrl: false,
   },
 });
