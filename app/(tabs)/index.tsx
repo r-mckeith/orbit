@@ -22,12 +22,11 @@ const ContentContainer = styled(YStack, {
 export default function HomeScreen() {
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  const { mutate: toggleHabit } = useToggleHabitData();
 
   const { data: habits = [], isLoading, error } = useHabits();
 
   const { data: categories = [] } = useHabitCategories(habits);
-
-  const { mutate: toggleHabit } = useToggleHabitData();
 
   // Mutation for adding a new habit
   const addHabitMutation = useAddHabit();
