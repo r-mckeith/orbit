@@ -7,12 +7,7 @@ import { Plus } from '@tamagui/lucide-icons';
 import { useRef, useState } from 'react';
 import { ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, H2, Spinner, Text, XStack, YStack, styled } from 'tamagui';
-
-const ContentContainer = styled(YStack, {
-  padding: 16,
-  space: 16,
-});
+import { Button, H2, Spinner, Text, XStack, YStack } from 'tamagui';
 
 export default function HomeScreen() {
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
@@ -37,10 +32,6 @@ export default function HomeScreen() {
   }
 
   const sections = buildSections(habits);
-
-  const handleModalClose = () => {
-    setIsAddModalVisible(false);
-  };
 
   function handleAddHabit(newHabit: Omit<Habit, 'id' | 'created_at' | 'user_id'>) {
     addHabit(newHabit);
@@ -85,7 +76,7 @@ export default function HomeScreen() {
               </Button>
             </YStack>
           ) : (
-            <YStack gap={16}>
+            <YStack gap={10}>
               {sections.map(section => (
                 <HabitCategoryCard key={section.id} category={section} onToggleHabit={handleToggleHabit} />
               ))}
@@ -94,7 +85,7 @@ export default function HomeScreen() {
         </ScrollView>
       </YStack>
 
-      <AddHabitModal visible={isAddModalVisible} onClose={handleModalClose} onAddHabit={handleAddHabit} />
+      <AddHabitModal visible={isAddModalVisible} onClose={() => setIsAddModalVisible(false)} onAddHabit={handleAddHabit} />
     </SafeAreaView>
   );
 }
