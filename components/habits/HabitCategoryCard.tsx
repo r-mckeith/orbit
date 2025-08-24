@@ -1,6 +1,6 @@
 import { Card, H4, XStack, YStack, styled } from 'tamagui';
-import { HabitPill } from '../../components/habits';
 import { HabitCategory } from '../../types/habits';
+import HabitPill from './HabitPill';
 
 
 // Styled component for category cards
