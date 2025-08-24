@@ -1,7 +1,5 @@
-import { useState, useCallback } from 'react';
-import { HabitCategory, Habit } from '../types/habits';
-
-type SetCategoriesAction = (prevCategories: HabitCategory[]) => HabitCategory[];
+import { useCallback, useState } from 'react';
+import { HabitCategory } from '../types/habits';
 
 export function useCategories(initialCategories: HabitCategory[] = []) {
   const [categories, setCategories] = useState<HabitCategory[]>(initialCategories);

@@ -8,7 +8,6 @@ import { useAddHabit, useHabitCategories, useHabits } from '../../hooks/useHabit
 import { useToggleHabitData } from '../../src/api/habits/useToggleHabitData';
 import { Habit } from '../../types/habits';
 
-// Styled components for the main layout
 const ScreenContainer = styled(SafeAreaView, {
   flex: 1,
   backgroundColor: '$background',
@@ -28,15 +27,12 @@ export default function HomeScreen() {
 
   const { data: categories = [] } = useHabitCategories(habits);
 
-  // Mutation for adding a new habit
   const addHabitMutation = useAddHabit();
 
-  // Handle modal close
   const handleModalClose = () => {
     setIsAddModalVisible(false);
   };
 
-  // Handle adding a new habit
   const handleAddHabit = async (newHabit: Omit<Habit, 'id' | 'created_at' | 'user_id'>) => {
     try {
       await addHabitMutation.mutateAsync(newHabit);
