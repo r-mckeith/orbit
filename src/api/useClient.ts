@@ -1,56 +1,51 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
-import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 
-const ExpoSecureStoreAdapter = {
-  getItem: async (key: string): Promise<string | null> => {
-    try {
-      const value = await SecureStore.getItemAsync(key);
-      return value;
-    } catch (error) {
-      console.error(`Error getting item for key "${key}":`, error);
-      return null;
-    }
-  },
+const supabaseUrl = 'https://ditfloepmylydershdus.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpdGZsb2VwbXlseWRlcnNoZHVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzODg5ODQsImV4cCI6MjA3MDk2NDk4NH0.vn27-wqNDoDVXyFsDv0-DaQPdMxaleNJcCGbTJj-m6U';
 
-  setItem: async (key: string, value: string): Promise<void> => {
-    try {
-      const session = JSON.parse(value);
-
-      const minimalSession = JSON.stringify({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-        expires_at: session.expires_at,
-        user: {
-          id: session.user.id,
-          email: session.user.email
-        },
-      });
-      console.log(minimalSession);
-
-      await SecureStore.setItemAsync(key, minimalSession);
-    } catch (error) {
-      console.error(`Error setting item for key "${key}":`, error);
-    }
-  },
-
-  removeItem: async (key: string): Promise<void> => {
-    try {
-      await SecureStore.deleteItemAsync(key);
-    } catch (error) {
-      console.error(`Error removing item for key "${key}":`, error);
-    }
-  },
+// Cross-platform storage adapter that DOES NOT alter values
+type StorageAdapter = {
+  getItem: (key: string) => Promise<string | null>;
+  setItem: (key: string, value: string) => Promise<void>;
+  removeItem: (key: string) => Promise<void>;
 };
 
-const supabaseUrl = 'https://ditfloepmylydershdus.supabase.co';
-const SUPABASE_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpdGZsb2VwbXlseWRlcnNoZHVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzODg5ODQsImV4cCI6MjA3MDk2NDk4NH0.vn27-wqNDoDVXyFsDv0-DaQPdMxaleNJcCGbTJj-m6U';
+const makeStorage = (): StorageAdapter => {
+  if (Platform.OS === 'web') {
+    // Use localStorage on web
+    // Guard for SSR just in case
+    const ls = typeof window !== 'undefined' ? window.localStorage : undefined;
 
-export const supabase = createClient(supabaseUrl, SUPABASE_API_KEY, {
+    return {
+      async getItem(key) {
+        return ls ? ls.getItem(key) : null;
+      },
+      async setItem(key, value) {
+        if (ls) ls.setItem(key, value);
+      },
+      async removeItem(key) {
+        if (ls) ls.removeItem(key);
+      },
+    };
+  }
+
+  // Native: use AsyncStorage (recommended by Supabase for RN)
+  return {
+    getItem: (key) => AsyncStorage.getItem(key),
+    setItem: (key, value) => AsyncStorage.setItem(key, value),
+    removeItem: (key) => AsyncStorage.removeItem(key),
+  };
+};
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: ExpoSecureStoreAdapter as any,
+    storage: makeStorage(),
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    // On web, allow Supabase to parse OAuth redirects (?code=...); on native, you typically use deep links
+    detectSessionInUrl: Platform.OS === 'web',
   },
 });

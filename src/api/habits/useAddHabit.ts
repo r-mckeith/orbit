@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../../lib/supabase';
 import { Habit } from '../../../types/habits';
+import { supabase } from '../useClient';
 
 export const HABITS_QUERY_KEY = 'habits';
 
