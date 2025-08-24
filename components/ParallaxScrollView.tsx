@@ -1,7 +1,6 @@
 import { useBottomTabOverflow } from '@/components/ui/TabBarBackground';
-import useColorScheme from '@/hooks/useColorScheme';
 import type { PropsWithChildren, ReactElement } from 'react';
-import { Platform, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import Animated, {
   interpolate,
   useAnimatedRef,
@@ -20,10 +19,7 @@ type Props = PropsWithChildren<{
 export default function ParallaxScrollView({
   children,
   headerImage,
-  headerBackgroundColor,
 }: Props) {
-  const scheme = useColorScheme();
-  const colorScheme = Platform.OS === 'web' ? 'dark' : scheme || 'light';
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollOffset = useScrollViewOffset(scrollRef);
   const bottom = useBottomTabOverflow();
@@ -54,7 +50,7 @@ export default function ParallaxScrollView({
         <Animated.View
           style={[
             styles.header,
-            { backgroundColor: headerBackgroundColor[colorScheme] },
+            { backgroundColor: 'white' },
             headerAnimatedStyle,
           ]}>
           {headerImage}
