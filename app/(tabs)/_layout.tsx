@@ -4,12 +4,11 @@ import React from 'react';
 import { Platform } from 'react-native';
 
 import { HapticTab } from '@/components/HapticTab';
-import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import useColorScheme from '@/hooks/useColorScheme';
-import { Database } from '@tamagui/lucide-icons';
+import { Database, Target } from '@tamagui/lucide-icons';
 
 export default function TabsLayout() {
   const { session, loading } = useAuth();
@@ -28,15 +27,17 @@ export default function TabsLayout() {
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
         tabBarStyle: Platform.select({
-          ios: { position: 'absolute' }, // lets the blur show through
+          ios: { position: 'absolute' },
+          android: {},
+          web: { display: 'none' },
           default: {},
         }),
       }}>
       <Tabs.Screen
         name='index'
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name='house.fill' color={color} />,
+          title: 'Circles',
+          tabBarIcon: ({ color }) => <Target size={28} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -44,8 +45,6 @@ export default function TabsLayout() {
         options={{
           title: 'Data',
           tabBarIcon: ({ color }) => <Database size={28} color={color} />,
-          // hide the tab only on web
-          tabBarButton: Platform.OS === 'web' ? () => null : undefined,
         }}
       />
     </Tabs>
