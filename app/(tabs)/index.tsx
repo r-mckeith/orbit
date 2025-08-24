@@ -1,17 +1,13 @@
+import { AddHabitModal, HabitCategoryCard } from '@/components/habits';
+import { useAddHabit } from '@/src/api/habits/useAddHabit';
+import { useGetHabits } from '@/src/api/habits/useGetHabits';
+import { useToggleHabitData } from '@/src/api/habits/useToggleHabitData';
+import { Habit } from '@/types/habits';
 import { Plus } from '@tamagui/lucide-icons';
 import { useRef, useState } from 'react';
-import { Alert, ScrollView } from 'react-native';
+import { ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, H2, Text, XStack, YStack, styled } from 'tamagui';
-import { AddHabitModal, HabitCategoryCard } from '../../components/habits';
-import { useAddHabit, useHabits } from '../../hooks/useHabits';
-import { useToggleHabitData } from '../../src/api/habits/useToggleHabitData';
-import { Habit } from '../../types/habits';
-
-const ScreenContainer = styled(SafeAreaView, {
-  flex: 1,
-  backgroundColor: '$background',
-});
+import { Button, H2, Spinner, Text, XStack, YStack, styled } from 'tamagui';
 
 const ContentContainer = styled(YStack, {
   padding: 16,
@@ -21,9 +17,10 @@ const ContentContainer = styled(YStack, {
 export default function HomeScreen() {
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  const { mutate: addHabit } = useAddHabit();
   const { mutate: toggleHabit } = useToggleHabitData();
 
-  const { data: habits = [], isLoading, error } = useHabits();
+  const { data: habits = [], isLoading, error } = useGetHabits();
 
   const CATEGORY_IDS = ['outer', 'middle', 'inner'] as const;
 
@@ -41,43 +38,36 @@ export default function HomeScreen() {
 
   const sections = buildSections(habits);
 
-  const addHabitMutation = useAddHabit();
-
   const handleModalClose = () => {
     setIsAddModalVisible(false);
   };
 
-  const handleAddHabit = async (newHabit: Omit<Habit, 'id' | 'created_at' | 'user_id'>) => {
-    try {
-      await addHabitMutation.mutateAsync(newHabit);
-      setIsAddModalVisible(false);
-    } catch (err) {
-      console.error('Error adding habit:', err);
-      Alert.alert('Error', 'Failed to add habit');
-    }
-  };
+  function handleAddHabit(newHabit: Omit<Habit, 'id' | 'created_at' | 'user_id'>) {
+    addHabit(newHabit);
+  }
+
   function handleToggleHabit(habitId: string) {
     toggleHabit({ habitId });
   }
 
   return (
-    <ScreenContainer>
-      <ScrollView ref={scrollViewRef} contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-        <ContentContainer>
-          <XStack justifyContent='space-between' alignItems='center' marginBottom='$4'>
-            <H2>Circles</H2>
-            <Button
-              circular
-              size='$4'
-              icon={<Plus size={'$7'} strokeWidth={3} />}
-              onPress={() => setIsAddModalVisible(true)}
-              backgroundColor='$blue10'
-              color='white'
-            />
-          </XStack>
-
+    <SafeAreaView style={{ flex: 1, backgroundColor: '$background' }}>
+      <YStack padding={16} gap={10}>
+        <XStack justifyContent='space-between' alignItems='center' marginBottom='$4'>
+          <H2>Circles</H2>
+          <Button
+            circular
+            size='$4'
+            icon={<Plus size={'$7'} strokeWidth={3} />}
+            onPress={() => setIsAddModalVisible(true)}
+            backgroundColor='$blue10'
+            color='white'
+          />
+        </XStack>
+        <ScrollView ref={scrollViewRef} contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
           {isLoading ? (
-            <YStack flex={1} justifyContent='center' alignItems='center' paddingVertical='$8'>
+            <YStack flex={1} justifyContent='center' alignItems='center' paddingVertical='$8' gap='$10'>
+              <Spinner />
               <Text>Loading habits...</Text>
             </YStack>
           ) : error ? (
@@ -87,7 +77,7 @@ export default function HomeScreen() {
                 <Text>Retry</Text>
               </Button>
             </YStack>
-          ) : sections.length === 0 ? (
+          ) : habits.length === 0 ? (
             <YStack flex={1} justifyContent='center' alignItems='center' space='$4' paddingVertical='$8'>
               <Text>No habits found.</Text>
               <Button onPress={() => setIsAddModalVisible(true)}>
@@ -101,10 +91,10 @@ export default function HomeScreen() {
               ))}
             </YStack>
           )}
-        </ContentContainer>
-      </ScrollView>
+        </ScrollView>
+      </YStack>
 
       <AddHabitModal visible={isAddModalVisible} onClose={handleModalClose} onAddHabit={handleAddHabit} />
-    </ScreenContainer>
+    </SafeAreaView>
   );
 }
