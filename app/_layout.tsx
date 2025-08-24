@@ -2,7 +2,7 @@
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
 import 'react-native-reanimated';
@@ -19,22 +19,7 @@ const useAppColorScheme = (): 'light' | 'dark' => {
 };
 
 function RootLayoutNav() {
-  const { session, loading } = useAuth();
-  const segments = useSegments();
-  const router = useRouter();
-
-  // useEffect(() => {
-  //   if (loading) return;
-
-  //   const top = segments[0]; // can be undefined briefly
-  //   const inAuthGroup = top === '(auth)';
-
-  //   if (session && inAuthGroup) {
-  //     router.replace('/(tabs)');
-  //   } else if (!session && !inAuthGroup) {
-  //     router.replace('/(auth)');
-  //   }
-  // }, [session, loading, segments, router]);
+  const { loading } = useAuth();
 
   if (loading) return null;
 
@@ -51,7 +36,7 @@ export default function RootLayout() {
   const colorScheme = useAppColorScheme();
   const [loaded] = useFonts({ SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf') });
 
-  if (!loaded) return null; // or SplashScreen-handoff
+  if (!loaded) return null; // add SplashScreen-handoff
 
   const theme = colorScheme || 'light';
 
