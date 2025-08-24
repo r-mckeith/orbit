@@ -4,7 +4,7 @@ import { Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, H2, Text, XStack, YStack, styled } from 'tamagui';
 import { AddHabitModal, HabitCategoryCard } from '../../components/habits';
-import { useAddHabit, useHabitCategories, useHabits } from '../../hooks/useHabits';
+import { useAddHabit, useHabits } from '../../hooks/useHabits';
 import { useToggleHabitData } from '../../src/api/habits/useToggleHabitData';
 import { Habit } from '../../types/habits';
 
@@ -25,7 +25,21 @@ export default function HomeScreen() {
 
   const { data: habits = [], isLoading, error } = useHabits();
 
-  const { data: categories = [] } = useHabitCategories(habits);
+  const CATEGORY_IDS = ['outer', 'middle', 'inner'] as const;
+
+  function buildSections(habits: Habit[] = []) {
+    return CATEGORY_IDS.map(id => {
+      const title = id === 'inner' ? 'Inner Circle' : id === 'middle' ? 'Middle Circle' : 'Outer Circle';
+
+      return {
+        id,
+        title,
+        habits: habits.filter(h => h.category === id),
+      };
+    });
+  }
+
+  const sections = buildSections(habits);
 
   const addHabitMutation = useAddHabit();
 
@@ -73,7 +87,7 @@ export default function HomeScreen() {
                 <Text>Retry</Text>
               </Button>
             </YStack>
-          ) : categories.length === 0 ? (
+          ) : sections.length === 0 ? (
             <YStack flex={1} justifyContent='center' alignItems='center' space='$4' paddingVertical='$8'>
               <Text>No habits found.</Text>
               <Button onPress={() => setIsAddModalVisible(true)}>
@@ -82,8 +96,8 @@ export default function HomeScreen() {
             </YStack>
           ) : (
             <YStack gap={16}>
-              {categories.map(category => (
-                <HabitCategoryCard key={category.id} category={category} onToggleHabit={handleToggleHabit} />
+              {sections.map(section => (
+                <HabitCategoryCard key={section.id} category={section} onToggleHabit={handleToggleHabit} />
               ))}
             </YStack>
           )}
