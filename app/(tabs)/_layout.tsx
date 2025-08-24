@@ -9,13 +9,14 @@ import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import useColorScheme from '@/hooks/useColorScheme';
+import { Database } from '@tamagui/lucide-icons';
 
 export default function TabsLayout() {
   const { session, loading } = useAuth();
 
   // Block rendering until we know auth state
   if (loading) return null;
-  if (!session) return <Redirect href="/(auth)" />;
+  if (!session) return <Redirect href='/(auth)' />;
 
   const colorScheme = Platform.OS === 'web' ? 'dark' : useColorScheme() ?? 'light';
 
@@ -30,15 +31,21 @@ export default function TabsLayout() {
           ios: { position: 'absolute' }, // lets the blur show through
           default: {},
         }),
-      }}
-    >
+      }}>
       <Tabs.Screen
-        name="index"
+        name='index'
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="house.fill" color={color} />
-          ),
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name='house.fill' color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name='habitData'
+        options={{
+          title: 'Data',
+          tabBarIcon: ({ color }) => <Database size={28} color={color} />,
+          // hide the tab only on web
+          tabBarButton: Platform.OS === 'web' ? () => null : undefined,
         }}
       />
     </Tabs>
