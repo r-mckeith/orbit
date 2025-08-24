@@ -6,7 +6,6 @@ import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
 import 'react-native-reanimated';
 import { TamaguiProvider } from 'tamagui';
-
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import useColorScheme from '../hooks/useColorScheme';
 import config from '../tamagui.config';

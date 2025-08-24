@@ -48,8 +48,8 @@ export default function HomeScreen() {
           <H2>Circles</H2>
           <Button
             circular
-            size='$4'
-            icon={<Plus size={'$7'} strokeWidth={3} />}
+            size='$3'
+            icon={<Plus size={'$2'} strokeWidth={3} />}
             onPress={() => setIsAddModalVisible(true)}
             backgroundColor='$blue10'
             color='white'
@@ -62,7 +62,7 @@ export default function HomeScreen() {
               <Text>Loading habits...</Text>
             </YStack>
           ) : error ? (
-            <YStack flex={1} justifyContent='center' alignItems='center' space='$2' paddingVertical='$8'>
+            <YStack flex={1} justifyContent='center' alignItems='center' gap='$2' paddingVertical='$8'>
               <Text color='$red10'>Failed to load habits</Text>
               <Button onPress={() => window.location.reload()}>
                 <Text>Retry</Text>

@@ -11,7 +11,7 @@ const CategoryCard = styled(Collapsible, {
   borderRadius: 8,
   backgroundColor: '$backgroundHover',
   borderWidth: 1,
-  borderColor: '$borderColor',
+  borderColor: '$color',
 });
 
 const HabitPillsContainer = styled(XStack, {

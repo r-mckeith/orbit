@@ -6,8 +6,8 @@ const HabitPill = styled(View, {
   paddingHorizontal: 12,
   paddingVertical: 8,
   borderRadius: 8,
-  marginRight: 8,
-  marginBottom: 8,
+  marginRight: 5,
+  marginBottom: 5,
   alignSelf: 'flex-start',
   maxWidth: '100%',
 });
@@ -24,28 +24,17 @@ interface HabitPillComponentProps {
   onToggleHabit: (habitId: string) => void;
 }
 
-export default function HabitPillComponent({
-  habit,
-  onToggleHabit,
-}: HabitPillComponentProps) {
+export default function HabitPillComponent({ habit, onToggleHabit }: HabitPillComponentProps) {
   const isSelected = !!habit.isSelected;
   const color = getDefaultColorForCategory(habit.category);
 
   return (
     <Pressable onPress={() => onToggleHabit(habit.id)}>
       <HabitPill
-        style={{
-          backgroundColor: isSelected ? `${color}20` : '#f1f1f1',
-          borderWidth: 1,
-          borderColor: isSelected ? `${color}40` : '#e0e0e0',
-        }}
-      >
-        <HabitPillText
-          style={{
-            color: isSelected ? color : '#333', // ✅ category color if selected, default text if not
-            opacity: isSelected ? 1 : 0.9,
-          }}
-        >
+        backgroundColor={isSelected ? `${color}20` : '$background'}
+        borderWidth={1}
+        borderColor={isSelected ? `${color}40` : '$color'}>
+        <HabitPillText opacity={isSelected ? 1 : 0.9} color={isSelected ? color : '$color'}>
           {habit.name}
         </HabitPillText>
       </HabitPill>
