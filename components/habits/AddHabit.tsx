@@ -1,449 +1,175 @@
-import { Button, Input, Label, Paragraph, Sheet, Switch, TextArea, XStack, YStack } from 'tamagui';
-import React, { useEffect } from 'react';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Keyboard } from 'react-native';
-import { HabitWithData, Schedule } from '@src/types';
-import CustomDropdown from '../shared/CustomDropdown';
-import { ChevronDown, Plus, X } from '@tamagui/lucide-icons';
-import { Text } from 'tamagui';
-import { useAddOrUpdateHabit } from '@src/api/habits/useAddOrUpdateHabit';
-import { ArchiveHabit } from './ArchiveHabit';
-import { DeleteHabit } from './DeleteHabit';
-import { useDeleteHabit } from 'src/api/habits';
-import { ModalWrapper } from '../shared/ModalWrapper';
+import { useState } from 'react';
+import { Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { Button, Card, H2, Input, Text, XStack, YStack } from 'tamagui';
+import { Habit, HabitCategory } from '../../types/habits';
 
-export function AddHabitButton({ onPress }: { onPress: () => void }) {
-  return (
-    <Button circular size='$4' onPress={onPress} backgroundColor='$blue8'>
-      <Plus size='$1' strokeWidth={3} />
-    </Button>
-  );
-}
-
-// used to add or edit a habit
-// if we receive a habit that means we're editing
-
-type AddHabit = {
-  habit?: HabitWithData;
-  show: boolean;
+export default function AddHabitModal({
+  visible,
+  onClose,
+  onAddHabit,
+}: {
+  visible: boolean;
   onClose: () => void;
-};
+  onAddHabit: (habit: Omit<Habit, 'id'>) => void;
+}) {
+  const [habitName, setHabitName] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<HabitCategory['id']>('outer');
 
-type DayOfWeek = keyof Schedule;
-
-const defaultedSchedule = {
-  monday: false,
-  tuesday: false,
-  wednesday: false,
-  thursday: false,
-  friday: false,
-  saturday: false,
-  sunday: false,
-};
-
-const monToThurs: DayOfWeek[] = ['monday', 'tuesday', 'wednesday', 'thursday'];
-const friToSun: DayOfWeek[] = ['friday', 'saturday', 'sunday'];
-const daysOfWeek = [...monToThurs, ...friToSun];
-
-export function AddHabitModal({ habit, show, onClose }: AddHabit) {
-  const { mutate: saveHabit } = useAddOrUpdateHabit();
-  const { mutate: deleteHabit } = useDeleteHabit();
-
-  const defaultName = habit ? habit.name : '';
-  const defaultHasDescription = habit?.description ? true : false;
-  const defaultDescription = habit ? habit.description : '';
-  const defaultSection = habit?.section || 'outer';
-  const defaultHasTarget = habit ? !!habit.target : true;
-  const defaultTarget = habit && habit.target ? habit.target : 1;
-  const defaultTimeframe = habit && habit.timeframe ? habit.timeframe : 'day';
-  const defaultSchedule = habit && habit.schedule ? habit.schedule : defaultedSchedule;
-  const defaultWatchlist = habit && habit.watchlist ? habit.watchlist : false;
-  const defaultBottom = habit && habit.bottom ? habit.bottom : false;
-  const defaultBoundary = habit && habit.boundary ? habit.boundary : false;
-
-  const habitSchema = z.object({
-    name: z.string().min(1, 'Name is required'),
-    hasDescription: z.boolean().optional(),
-    description: z.string().optional(),
-    section: z.string(),
-    hasTarget: z.boolean(),
-    target: z.number().optional(),
-    timeframe: z.string().optional(),
-    schedule: z.object({
-      monday: z.boolean(),
-      tuesday: z.boolean(),
-      wednesday: z.boolean(),
-      thursday: z.boolean(),
-      friday: z.boolean(),
-      saturday: z.boolean(),
-      sunday: z.boolean(),
-    }),
-    watchlist: z.boolean().optional(),
-    bottom: z.boolean().optional(),
-    boundary: z.boolean().optional(),
-  });
-
-  const {
-    control,
-    handleSubmit,
-    watch,
-    setValue,
-    reset,
-    formState: { errors },
-  } = useForm({
-    resolver: zodResolver(habitSchema),
-    defaultValues: {
-      name: defaultName,
-      description: defaultDescription,
-      hasDescription: defaultDescription !== '',
-      section: defaultSection,
-      hasTarget: defaultHasTarget,
-      target: defaultTarget,
-      timeframe: defaultTimeframe,
-      schedule: defaultSchedule,
-      watchlist: defaultWatchlist,
-      bottom: defaultBottom,
-      boundary: defaultBoundary,
-    },
-  });
-
-  useEffect(() => {
-    reset({
-      name: habit?.name ?? '',
-      description: habit?.description ?? '',
-      hasDescription: habit?.description ? true : false,
-      section: habit?.section ?? 'outer',
-      hasTarget: habit ? !!habit.target : true,
-      target: habit?.target ?? 1,
-      timeframe: habit?.timeframe ?? 'day',
-      schedule: habit?.schedule ?? defaultedSchedule,
-      watchlist: habit?.watchlist ?? false,
-      bottom: habit?.bottom ?? false,
-      boundary: habit?.boundary ?? false,
-    });
-  }, [habit, reset]);
-
-  const hasChanges =
-    habit &&
-    (watch('name') !== habit.name ||
-      watch('description') !== habit.description ||
-      watch('section') !== habit.section ||
-      watch('hasTarget') !== !!habit.target ||
-      (watch('hasTarget') &&
-        (watch('target') !== habit.target || (habit.timeframe && watch('timeframe') !== habit.timeframe))) ||
-      (habit.schedule && JSON.stringify(watch('schedule')) !== JSON.stringify(habit.schedule)) ||
-      (habit.watchlist !== undefined && watch('watchlist') !== habit.watchlist) ||
-      (habit.bottom !== undefined && watch('bottom') !== habit.bottom) ||
-      (habit.boundary !== undefined && watch('boundary') !== habit.boundary));
-
-  const disabled = watch('name') === '' || (habit && !hasChanges);
-  const timeframes = ['day', 'week', 'month', 'custom'];
-
-  function handleClose() {
-    Keyboard.dismiss();
-    onClose();
-    resetState();
-  }
-
-  function handleSave(data: any) {
-    saveHabit({
-      habitId: habit ? habit.id : undefined,
-      name: data.name,
-      description: data.description,
-      section: data.section,
-      target: data.section === 'outer' ? data.target || null : null,
-      timeframe: data.section === 'outer' ? data.timeframe || null : null,
-      schedule: data.section === 'outer' ? data.schedule || null : null,
-      watchlist: data.watchlist,
-      bottom_line: data.section === 'inner' ? data.bottom || null : null,
-      boundary: data.section === 'middle' ? data.boundary || null : null,
-    });
-  }
-
-  function handleSaveAndAdd(data: any) {
-    handleSave(data);
-    resetState();
-  }
-
-  function handleSaveAndClose(data: any) {
-    handleSave(data);
-    handleClose();
-  }
-
-  function resetState() {
-    setValue('name', defaultName);
-    setValue('description', defaultDescription);
-    setValue('hasDescription', defaultHasDescription);
-    setValue('section', defaultSection);
-    setValue('hasTarget', defaultHasTarget);
-    setValue('target', defaultTarget);
-    setValue('timeframe', defaultTimeframe);
-    setValue('schedule', defaultSchedule);
-    setValue('watchlist', defaultWatchlist);
-    setValue('bottom', defaultBottom);
-    setValue('boundary', defaultBoundary);
-  }
-
-  const handleSetSchedule = (key: keyof Schedule, value: boolean) => {
-    const currentSchedule = watch('schedule') || defaultSchedule;
-    setValue('schedule', { ...currentSchedule, [key]: value });
-  };
-
-  function toggleTarget() {
-    const currentValue = watch('hasTarget');
-
-    if (currentValue) {
-      setValue('hasTarget', false);
-      setValue('target', undefined);
-      setValue('timeframe', undefined);
-      setValue('schedule', defaultedSchedule);
-    } else {
-      setValue('hasTarget', true);
-      setValue('target', defaultTarget);
-      setValue('timeframe', defaultTimeframe);
-      setValue('schedule', defaultSchedule);
+  const handleSubmit = () => {
+    if (!habitName.trim()) {
+      Alert.alert('Error', 'Please enter a habit name');
+      return;
     }
 
-    // Trigger hasChanges update
-    const currentSection = watch('section');
-    setValue('section', currentSection);
-  }
-  if (!show) return null;
+    onAddHabit({
+      name: habitName.trim(),
+      category: selectedCategory,
+      color: getDefaultColorForCategory(selectedCategory),
+    });
+
+    setHabitName('');
+    setSelectedCategory('outer');
+    onClose();
+  };
 
   return (
-    <ModalWrapper show={show} onClose={onClose} fullscreen>
-      <XStack jc='space-between' ai='center'>
-        <Button chromeless onPress={onClose}>
-          <X />
-        </Button>
-        <Text fontSize='$7' fontWeight='800'>
-          {habit ? habit.name : 'Add Habit'}
-        </Text>
-        <Button chromeless onPress={onClose} disabled={disabled}>
-          <Text color={disabled ? undefined : '$blue8'} fontWeight='600'>
-            Save
-          </Text>
-        </Button>
-      </XStack>
+    <YStack
+      position='absolute'
+      top={0}
+      left={0}
+      right={0}
+      bottom={0}
+      backgroundColor='$backgroundStrong'
+      justifyContent='center'
+      alignItems='center'
+      padding={Platform.select({ ios: 16, android: 32 })}
+      display={visible ? 'flex' : 'none'}>
+      <KeyboardAvoidingView
+        style={{ width: '100%', flex: 1, justifyContent: 'center' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}>
+        <Card
+          width='100%'
+          maxWidth={500}
+          backgroundColor='$background'
+          borderWidth={1}
+          borderColor='$borderColor'
+          elevation={0}
+          marginHorizontal={Platform.OS === 'ios' ? 0 : 16}
+          alignSelf='center'>
+          <YStack paddingHorizontal={20} paddingVertical={20} gap={24}>
+            <YStack gap={8}>
+              <H2 fontSize={24} fontWeight='600'>
+                New
+              </H2>
+            </YStack>
 
-      <YStack gap='$2'>
-        <YStack>
-          <Label fontSize='$5' color='$color' fontWeight='600'>
-            Circle
-          </Label>
-          <XStack gap='$3' ai='center' jc='center' backgroundColor='$background' borderRadius='$4' overflow='hidden'>
-            {['outer', 'middle', 'inner'].map(section => {
-              return (
-                <Controller
-                  key={section}
-                  control={control}
-                  name='section'
-                  render={({ field: { onChange, value } }) => (
+            <YStack gap={24}>
+              <YStack gap={8}>
+                <Input
+                  id='habitName'
+                  placeholder=''
+                  value={habitName}
+                  onChangeText={setHabitName}
+                  autoFocus
+                  fontSize={18}
+                  height={56}
+                  paddingHorizontal={16}
+                  borderWidth={2}
+                  borderColor='$borderColor'
+                  backgroundColor='$backgroundHover'
+                  color='$color'
+                  placeholderTextColor='$colorHover'
+                  borderRadius={12}
+                  width='100%'
+                />
+              </YStack>
+
+              <XStack gap={10} width='100%'>
+                {(['outer', 'middle', 'inner'] as const).map(category => {
+                  const isSelected = selectedCategory === category;
+                  const categoryColor = getDefaultColorForCategory(category, true);
+
+                  return (
                     <Button
+                      key={category}
                       flex={1}
-                      key={section}
-                      backgroundColor={value === section ? '$blue8' : '$background'}
-                      borderWidth={1}
-                      borderColor={value === section ? '$blue8' : '$borderColor'}
-                      onPress={() => {
-                        onChange(section);
-                        if (section !== 'outer') {
-                          setValue('hasTarget', false);
-                        } else if (section === 'outer') {
-                          toggleTarget();
-                        }
-                      }}
-                      padding='$2'
-                      borderRadius='$4'
-                      elevation={value === section ? '$2' : undefined}>
+                      height={44}
+                      borderRadius={10}
+                      onPress={() => setSelectedCategory(category)}
+                      backgroundColor={isSelected ? `${categoryColor}20` : '$backgroundHover'}
+                      borderWidth={1.5}
+                      borderColor={isSelected ? categoryColor : '$borderColor'}
+                      alignItems='center'
+                      justifyContent='center'
+                      pressStyle={{
+                        backgroundColor: isSelected ? `${categoryColor}30` : '$backgroundHover',
+                      }}>
                       <Text
-                        fontSize='$4'
-                        color={value === section ? 'white' : '$gray10'}
-                        fontWeight={value === section ? '800' : '400'}
-                        textAlign='center'>
-                        {section.charAt(0).toUpperCase() + section.slice(1)}
+                        fontSize={14}
+                        fontWeight={isSelected ? '600' : '500'}
+                        color={isSelected ? categoryColor : '$color'}>
+                        {category.charAt(0).toUpperCase() + category.slice(1)}
                       </Text>
                     </Button>
-                  )}
-                />
-              );
-            })}
-          </XStack>
-        </YStack>
+                  );
+                })}
+              </XStack>
+            </YStack>
 
-        <YStack>
-          <Label fontSize='$5' color='$color' fontWeight='600'>
-            Name
-          </Label>
-          <Controller
-            control={control}
-            name='name'
-            render={({ field: { onChange, value } }) => (
-              <Input
-                placeholder='Enter habit name'
-                value={value}
-                onChangeText={onChange}
-                backgroundColor='$background'
-                borderRadius='$4'
-                size='$4'
-                returnKeyType='done'
-              />
-            )}
-          />
-          {errors.name && (
-            <Text color='$red10' fontSize='$3'>
-              {errors.name.message}
-            </Text>
-          )}
-        </YStack>
-
-        <YStack>
-          <XStack ai='center' jc='space-between' onPress={() => setValue('hasDescription', !watch('hasDescription'))}>
-            <Label fontSize='$5' color='$color' fontWeight='600'>
-              Description
-            </Label>
-            <ChevronDown rotate={watch('hasDescription') ? '180deg' : '0deg'} transition='transform 150ms' />
-          </XStack>
-
-          {watch('hasDescription') && (
-            <Controller
-              control={control}
-              name='description'
-              render={({ field: { onChange, value } }) => (
-                <TextArea
-                  placeholder='Add more details...'
-                  value={value}
-                  onChangeText={onChange}
-                  backgroundColor='$background'
-                  borderRadius='$4'
-                  size='$4'
-                />
-              )}
-            />
-          )}
-        </YStack>
-
-        <XStack ai='center' jc='space-between'>
-          <Label paddingRight='$2' justifyContent='flex-end' fontSize='$5' fontWeight='600'>
-            Watchlist
-          </Label>
-          <Controller
-            control={control}
-            name='watchlist'
-            render={({ field: { onChange, value } }) => (
-              <Switch size='$2' checked={value} onCheckedChange={onChange} bw={1}>
-                <Switch.Thumb animation='quick' size='$2.5' />
-              </Switch>
-            )}
-          />
-        </XStack>
-
-        <XStack ai='center' jc='space-between'>
-          <Label paddingRight='$2' justifyContent='flex-end' fontSize='$5' fontWeight='600'>
-            {watch('section') === 'middle' ? 'Boundary' : watch('section') === 'inner' ? 'Bottom Line' : 'Target'}
-          </Label>
-          <Controller
-            control={control}
-            name='hasTarget'
-            render={({ field: { value } }) => (
-              <Switch size='$2' checked={value} onCheckedChange={() => toggleTarget()} bw={1}>
-                <Switch.Thumb animation='quick' size='$2.5' />
-              </Switch>
-            )}
-          />
-        </XStack>
-
-        {watch('hasTarget') && (
-          <XStack ai='center' jc='space-between' bc='$backgroundStrong' br='$4' zIndex={5} p='$2'>
-            <Controller
-              control={control}
-              name='target'
-              render={({ field: { onChange, value } }) => (
-                <Input
-                  flex={1}
-                  keyboardType='numeric'
-                  value={value !== null && value !== undefined ? value.toString() : ''}
-                  onChangeText={input => {
-                    if (input === '') {
-                      onChange(null);
-                    } else {
-                      onChange(Number(input.replace(/^0+/, '')));
-                    }
-                  }}
-                  maxLength={2}
-                  textAlign='center'
-                  backgroundColor='$backgroundStrong'
-                  fontSize={18}
-                  fontWeight='600'
-                  color='$color'
-                />
-              )}
-            />
-
-            <Paragraph fontSize={18} minWidth={80} textAlign='center' flex={1} fontWeight='500'>
-              {watch('target') === null || watch('target') === 1 ? 'time per' : 'times per'}
-            </Paragraph>
-            <XStack>
-              <CustomDropdown
-                items={timeframes}
-                selectedItem={watch('timeframe') ?? null}
-                setSelectedItem={value => setValue('timeframe', value)}
-              />
+            <XStack gap={12} justifyContent='space-between' paddingTop={16} width='100%'>
+              <Button
+              chromeless
+                onPress={onClose}
+                paddingHorizontal={16}
+                height={44}
+                borderRadius={10}
+                flex={1}
+                alignItems='center'
+                justifyContent='center'
+                >
+                <Text fontSize={14} fontWeight='500' color='$color'>
+                  Cancel
+                </Text>
+              </Button>
+              <Button
+                onPress={handleSubmit}
+                backgroundColor={'$backgroundHover'}
+                borderWidth={1.5}
+                paddingHorizontal={16}
+                height={44}
+                borderRadius={10}
+                flex={1}
+                alignItems='center'
+                justifyContent='center'
+                disabled={!habitName.trim()}
+                opacity={!habitName.trim() ? 0.5 : 1}
+                pressStyle={{
+                  backgroundColor: '$backgroundHover'
+                }}>
+                <Text fontSize={14} fontWeight='600'>
+                  Add
+                </Text>
+              </Button>
             </XStack>
-          </XStack>
-        )}
-
-        {watch('hasTarget') && watch('timeframe') === 'custom' && (
-          <XStack jc='space-evenly' ai='center' backgroundColor='$backgroundStrong' py='$2' br='$4' borderWidth={1} borderColor='$borderColor'>
-            {daysOfWeek.map(day => {
-              return (
-                <Button
-                  key={day}
-                  h={40}
-                  w={40}
-                  br={16}
-                  p={0}
-                  onPress={() => handleSetSchedule(day, !watch('schedule')[day])}
-                  backgroundColor={watch('schedule')[day] ? '$blue8' : undefined}>
-                  <Text fontSize='$1'>{day.slice(0, 3).toUpperCase()}</Text>
-                </Button>
-              );
-            })}
-          </XStack>
-        )}
-      </YStack>
-      <YStack position='absolute' bottom={5} gap='$3' jc='space-between' left={10} right={10}>
-        {habit && (
-          <XStack ai='center' jc='space-around'>
-            <ArchiveHabit habit={habit} archiveHabit={saveHabit} />
-            <DeleteHabit habit={habit} deleteHabit={deleteHabit} />
-          </XStack>
-        )}
-        <XStack jc='space-around'>
-          <Button
-            width={!habit ? '45%' : '90%'}
-            backgroundColor={disabled ? undefined : habit ? '$blue8' : '$blue4'}
-            onPress={handleSubmit(handleSaveAndClose)}
-            disabled={disabled}>
-            <Text fontWeight='600' color='white' fontSize='$6'>
-              Save
-            </Text>
-          </Button>
-          {!habit && (
-            <Button
-              width='45%'
-              backgroundColor={disabled ? undefined : '$blue8'}
-              onPress={handleSubmit(handleSaveAndAdd)}
-              disabled={disabled}>
-              <Text fontWeight='600' color='white' fontSize='$6'>
-                Save & Add
-              </Text>
-            </Button>
-          )}
-        </XStack>
-      </YStack>
-    </ModalWrapper>
+          </YStack>
+        </Card>
+      </KeyboardAvoidingView>
+    </YStack>
   );
 }
+
+const getDefaultColorForCategory = (category: HabitCategory['id'], isSelected: boolean = false): string => {
+  if (!isSelected) return '#BDBDBD';
+
+  switch (category) {
+    case 'outer':
+      return '#3b82f6';
+    case 'middle':
+      return '#f59e0b';
+    case 'inner':
+      return '#ef4444';
+    default:
+      return '#9E9E9E';
+  }
+};

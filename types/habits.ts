@@ -4,6 +4,7 @@ export type Habit = {
   category: 'outer' | 'middle' | 'inner';
   color: string;
   isSelected?: boolean;
+  selected?: boolean; // For optimistic updates
 };
 
 export type HabitCategory = {

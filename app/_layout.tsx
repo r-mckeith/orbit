@@ -1,48 +1,25 @@
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import 'react-native-reanimated';
 import { TamaguiProvider } from 'tamagui';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import useColorScheme from '../hooks/useColorScheme';
-import { Platform } from 'react-native';
 import config from '../tamagui.config';
 
-// Create a client for React Query
 const queryClient = new QueryClient();
 
-// Use the same pattern as in (tabs)/_layout.tsx
 const useAppColorScheme = (): 'light' | 'dark' => {
   return Platform.OS === 'web' ? 'dark' : useColorScheme() || 'dark';
 };
 
-// This component wraps our app with the AuthProvider
 function RootLayoutNav() {
-  const { session, loading } = useAuth();
-  const segments = useSegments();
-  const router = useRouter();
+  const { loading } = useAuth();
 
-  useEffect(() => {
-    if (loading) return;
-
-    const inAuthGroup = segments[0] === '(auth)';
-
-    if (session && inAuthGroup) {
-      // User is signed in and the initial segment is in the (auth) group.
-      router.replace('/(tabs)');
-    } else if (!session && !inAuthGroup) {
-      // User is not signed in and the initial segment is not in the (auth) group.
-      router.replace('/(auth)');
-    }
-  }, [session, loading, segments]);
-
-  if (loading) {
-    return null; // or a loading indicator
-  }
+  if (loading) return null;
 
   return (
     <Stack>
@@ -55,18 +32,12 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   const colorScheme = useAppColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
+  const [loaded] = useFonts({ SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf') });
 
-  if (!loaded) {
-    // Async font loading only occurs in development.
-    return null;
-  }
+  if (!loaded) return null; // add SplashScreen-handoff
 
-  // Ensure colorScheme is not null by providing a default value
   const theme = colorScheme || 'light';
-  
+
   return (
     <QueryClientProvider client={queryClient}>
       <TamaguiProvider config={config} defaultTheme={theme}>
