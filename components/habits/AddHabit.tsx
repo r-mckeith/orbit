@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import { Button, Card, H2, Input, Text, View, XStack, YStack } from 'tamagui';
+import { Button, Card, H2, Input, Text, XStack, YStack } from 'tamagui';
 import { Habit, HabitCategory } from '../../types/habits';
 
 export default function AddHabitModal({
@@ -33,13 +33,13 @@ export default function AddHabitModal({
   };
 
   return (
-    <View
+    <YStack
       position='absolute'
       top={0}
       left={0}
       right={0}
       bottom={0}
-      backgroundColor='$background'
+      backgroundColor='$backgroundStrong'
       justifyContent='center'
       alignItems='center'
       padding={Platform.select({ ios: 16, android: 32 })}
@@ -60,7 +60,7 @@ export default function AddHabitModal({
           <YStack paddingHorizontal={20} paddingVertical={20} gap={24}>
             <YStack gap={8}>
               <H2 fontSize={24} fontWeight='600'>
-                New Habit
+                New
               </H2>
             </YStack>
 
@@ -85,71 +85,41 @@ export default function AddHabitModal({
                 />
               </YStack>
 
-              <YStack gap={10}>
-                <Button
-                  width='100%'
-                  height={44}
-                  borderRadius={10}
-                  onPress={() => setSelectedCategory('outer')}
-                  backgroundColor={
-                    selectedCategory === 'outer' ? `${getDefaultColorForCategory('outer', true)}20` : '$backgroundHover'
-                  }
-                  borderWidth={1.5}
-                  borderColor={
-                    selectedCategory === 'outer' ? getDefaultColorForCategory('outer', true) : '$borderColor'
-                  }
-                  paddingHorizontal={12}
-                  alignItems='center'
-                  justifyContent='center'
-                  pressStyle={{
-                    backgroundColor:
-                      selectedCategory === 'outer'
-                        ? `${getDefaultColorForCategory('outer', true)}30`
-                        : '$backgroundHover',
-                  }}>
-                  <Text
-                    fontSize={14}
-                    fontWeight={selectedCategory === 'outer' ? '600' : '500'}
-                    color={selectedCategory === 'outer' ? getDefaultColorForCategory('outer', true) : '$color'}>
-                    Outer
-                  </Text>
-                </Button>
+              <XStack gap={10} width='100%'>
+                {(['outer', 'middle', 'inner'] as const).map(category => {
+                  const isSelected = selectedCategory === category;
+                  const categoryColor = getDefaultColorForCategory(category, true);
 
-                <XStack gap={10} width='100%'>
-                  {(['middle', 'inner'] as const).map(category => {
-                    const isSelected = selectedCategory === category;
-                    const categoryColor = getDefaultColorForCategory(category, true);
-
-                    return (
-                      <Button
-                        key={category}
-                        flex={1}
-                        height={44}
-                        borderRadius={10}
-                        onPress={() => setSelectedCategory(category)}
-                        backgroundColor={isSelected ? `${categoryColor}20` : '$backgroundHover'}
-                        borderWidth={1.5}
-                        borderColor={isSelected ? categoryColor : '$borderColor'}
-                        alignItems='center'
-                        justifyContent='center'
-                        pressStyle={{
-                          backgroundColor: isSelected ? `${categoryColor}30` : '$backgroundHover',
-                        }}>
-                        <Text
-                          fontSize={14}
-                          fontWeight={isSelected ? '600' : '500'}
-                          color={isSelected ? categoryColor : '$color'}>
-                          {category.charAt(0).toUpperCase() + category.slice(1)}
-                        </Text>
-                      </Button>
-                    );
-                  })}
-                </XStack>
-              </YStack>
+                  return (
+                    <Button
+                      key={category}
+                      flex={1}
+                      height={44}
+                      borderRadius={10}
+                      onPress={() => setSelectedCategory(category)}
+                      backgroundColor={isSelected ? `${categoryColor}20` : '$backgroundHover'}
+                      borderWidth={1.5}
+                      borderColor={isSelected ? categoryColor : '$borderColor'}
+                      alignItems='center'
+                      justifyContent='center'
+                      pressStyle={{
+                        backgroundColor: isSelected ? `${categoryColor}30` : '$backgroundHover',
+                      }}>
+                      <Text
+                        fontSize={14}
+                        fontWeight={isSelected ? '600' : '500'}
+                        color={isSelected ? categoryColor : '$color'}>
+                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                      </Text>
+                    </Button>
+                  );
+                })}
+              </XStack>
             </YStack>
 
             <XStack gap={12} justifyContent='space-between' paddingTop={16} width='100%'>
               <Button
+              chromeless
                 onPress={onClose}
                 paddingHorizontal={16}
                 height={44}
@@ -157,18 +127,15 @@ export default function AddHabitModal({
                 flex={1}
                 alignItems='center'
                 justifyContent='center'
-                pressStyle={{
-                  backgroundColor: '$backgroundHover',
-                }}>
+                >
                 <Text fontSize={14} fontWeight='500' color='$color'>
                   Cancel
                 </Text>
               </Button>
               <Button
                 onPress={handleSubmit}
-                backgroundColor={`${getDefaultColorForCategory(selectedCategory, true)}20`}
+                backgroundColor={'$backgroundHover'}
                 borderWidth={1.5}
-                borderColor={getDefaultColorForCategory(selectedCategory, true)}
                 paddingHorizontal={16}
                 height={44}
                 borderRadius={10}
@@ -178,17 +145,17 @@ export default function AddHabitModal({
                 disabled={!habitName.trim()}
                 opacity={!habitName.trim() ? 0.5 : 1}
                 pressStyle={{
-                  backgroundColor: `${getDefaultColorForCategory(selectedCategory, true)}30`,
+                  backgroundColor: '$backgroundHover'
                 }}>
-                <Text fontSize={14} fontWeight='600' color={getDefaultColorForCategory(selectedCategory, true)}>
-                  Add Habit
+                <Text fontSize={14} fontWeight='600'>
+                  Add
                 </Text>
               </Button>
             </XStack>
           </YStack>
         </Card>
       </KeyboardAvoidingView>
-    </View>
+    </YStack>
   );
 }
 
