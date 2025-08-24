@@ -1,47 +1,41 @@
-import { PropsWithChildren, useState } from 'react';
-import { StyleSheet, TouchableOpacity } from 'react-native';
+// components/Collapsible.tsx
+import { ChevronDown, ChevronRight } from '@tamagui/lucide-icons';
+import { useState } from 'react';
+import { Text, XStack, YStack, type StackProps } from 'tamagui';
 
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import { Colors } from '@/constants/Colors';
-import { Platform } from 'react-native';
-import useColorScheme from '@/hooks/useColorScheme';
+type CollapsibleProps = StackProps & {
+  title: string;
+  defaultOpen?: boolean;
+};
 
-export function Collapsible({ children, title }: PropsWithChildren & { title: string }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const scheme = useColorScheme();
-  const theme = Platform.OS === 'web' ? 'dark' : scheme || 'light';
+export function Collapsible({
+  title,
+  defaultOpen = true,
+  children,
+  ...frameProps
+}: CollapsibleProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <ThemedView>
-      <TouchableOpacity
-        style={styles.heading}
-        onPress={() => setIsOpen((value) => !value)}
-        activeOpacity={0.8}>
-        <IconSymbol
-          name="chevron.right"
-          size={18}
-          weight="medium"
-          color={theme === 'light' ? Colors.light.icon : Colors.dark.icon}
-          style={{ transform: [{ rotate: isOpen ? '90deg' : '0deg' }] }}
-        />
+    <YStack {...frameProps}>
+      <XStack
+        ai="center"
+        gap="$2"
+        onPress={() => setIsOpen((v) => !v)}
+        pressStyle={{ opacity: 0.8 }}
+        cursor="pointer"
+      >
+        {isOpen ? <ChevronDown /> : <ChevronRight />}
+        <Text fontSize="$6" fontWeight="600">
+          {title}
+        </Text>
+      </XStack>
 
-        <ThemedText type="defaultSemiBold">{title}</ThemedText>
-      </TouchableOpacity>
-      {isOpen && <ThemedView style={styles.content}>{children}</ThemedView>}
-    </ThemedView>
+      {isOpen && (
+        <YStack mt="$2">
+          {children}
+        </YStack>
+      )}
+    </YStack>
   );
 }
-
-const styles = StyleSheet.create({
-  heading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  content: {
-    marginTop: 6,
-    marginLeft: 24,
-  },
-});
