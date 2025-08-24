@@ -1,16 +1,14 @@
+import { useBottomTabOverflow } from '@/components/ui/TabBarBackground';
+import useColorScheme from '@/hooks/useColorScheme';
 import type { PropsWithChildren, ReactElement } from 'react';
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import Animated, {
   interpolate,
   useAnimatedRef,
   useAnimatedStyle,
   useScrollViewOffset,
 } from 'react-native-reanimated';
-
-import { ThemedView } from '@/components/ThemedView';
-import { useBottomTabOverflow } from '@/components/ui/TabBarBackground';
-import { Platform } from 'react-native';
-import useColorScheme from '@/hooks/useColorScheme';
+import { YStack } from 'tamagui';
 
 const HEADER_HEIGHT = 250;
 
@@ -47,7 +45,7 @@ export default function ParallaxScrollView({
   });
 
   return (
-    <ThemedView style={styles.container}>
+    <YStack style={styles.container}>
       <Animated.ScrollView
         ref={scrollRef}
         scrollEventThrottle={16}
@@ -61,9 +59,9 @@ export default function ParallaxScrollView({
           ]}>
           {headerImage}
         </Animated.View>
-        <ThemedView style={styles.content}>{children}</ThemedView>
+        <YStack style={styles.content}>{children}</YStack>
       </Animated.ScrollView>
-    </ThemedView>
+    </YStack>
   );
 }
 
